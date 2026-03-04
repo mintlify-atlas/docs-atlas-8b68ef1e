@@ -99,6 +99,7 @@
               "typescript/providers/openai",
               "typescript/providers/openai-agents",
               "typescript/providers/anthropic",
+              "typescript/providers/claude-agent-sdk",
               "typescript/providers/langchain",
               "typescript/providers/llamaindex",
               "typescript/providers/vercel",

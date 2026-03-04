@@ -1,0 +1,311 @@
+---
+title: Claude Agent SDK Provider
+description: Integrate Composio tools with Claude Code Agents SDK via MCP
+---
+
+The Claude Agent SDK provider enables seamless integration of Composio tools with [Claude Code Agents SDK](https://platform.claude.com/docs/en/agent-sdk/overview), allowing you to use any Composio-supported tool (Gmail, Slack, GitHub, etc.) within your Claude agents.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install @composio/claude-agent-sdk @composio/core @anthropic-ai/claude-agent-sdk
+```
+
+```bash pnpm
+pnpm add @composio/claude-agent-sdk @composio/core @anthropic-ai/claude-agent-sdk
+```
+
+```bash yarn
+yarn add @composio/claude-agent-sdk @composio/core @anthropic-ai/claude-agent-sdk
+```
+</CodeGroup>
+
+### Prerequisites
+
+<Steps>
+  <Step title="Install Claude Code CLI">
+    The Claude Agent SDK requires Claude Code to be installed:
+
+    <CodeGroup>
+    ```bash curl
+    curl -fsSL https://claude.ai/install.sh | bash
+    ```
+
+    ```bash homebrew
+    brew install --cask claude-code
+    ```
+
+    ```bash npm
+    npm install -g @anthropic-ai/claude-code
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Set up API keys">
+    Configure your environment variables:
+
+    ```bash
+    export ANTHROPIC_API_KEY="your-anthropic-api-key"
+    export COMPOSIO_API_KEY="your-composio-api-key"
+    ```
+
+    - **ANTHROPIC_API_KEY**: Get from [console.anthropic.com](https://console.anthropic.com)
+    - **COMPOSIO_API_KEY**: Get from [app.composio.dev](https://app.composio.dev)
+  </Step>
+</Steps>
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { ClaudeAgentSDKProvider } from '@composio/claude-agent-sdk';
+import { query, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+
+// Initialize Composio with Claude Agent SDK provider
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  provider: new ClaudeAgentSDKProvider(),
+});
+
+// Create a tool router session
+const session = await composio.create('external_user_id');
+
+// Get tools from the session
+const tools = await session.tools();
+
+// Create MCP server using Claude Agent SDK's createSdkMcpServer
+const customServer = createSdkMcpServer({
+  name: 'composio',
+  version: '1.0.0',
+  tools: tools,
+});
+
+// Use with Claude Agent SDK
+for await (const content of query({
+  prompt: 'Fetch my last email from gmail',
+  options: {
+    mcpServers: { composio: customServer },
+    permissionMode: 'bypassPermissions',
+  },
+})) {
+  if (content.type === 'assistant') {
+    console.log('Claude:', content.message);
+  }
+}
+
+console.log('✅ Received response from Claude');
+```
+
+## API Reference
+
+### ClaudeAgentSDKProvider
+
+The main provider class for integrating Composio tools with Claude Code Agents.
+
+<ParamField path="options" type="ClaudeAgentSDKProviderOptions" optional>
+  Configuration options for the provider
+
+  <Expandable title="properties">
+    <ParamField path="serverName" type="string" default="composio">
+      Name for the MCP server
+    </ParamField>
+
+    <ParamField path="serverVersion" type="string" default="1.0.0">
+      Version for the MCP server
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Methods
+
+#### wrapTool()
+
+Wraps a single Composio tool as a Claude Agent SDK MCP tool.
+
+```typescript
+wrapTool(
+  composioTool: Tool,
+  executeTool: ExecuteToolFn
+): ClaudeAgentTool
+```
+
+<ParamField path="composioTool" type="Tool" required>
+  The Composio tool to wrap
+</ParamField>
+
+<ParamField path="executeTool" type="ExecuteToolFn" required>
+  Function to execute the tool
+</ParamField>
+
+#### wrapTools()
+
+Wraps multiple Composio tools as Claude Agent SDK MCP tools.
+
+```typescript
+wrapTools(
+  tools: Tool[],
+  executeTool: ExecuteToolFn
+): ClaudeAgentToolCollection
+```
+
+<ParamField path="tools" type="Tool[]" required>
+  Array of Composio tools to wrap
+</ParamField>
+
+<ParamField path="executeTool" type="ExecuteToolFn" required>
+  Function to execute the tools
+</ParamField>
+
+## Examples
+
+### Using Multiple Tools
+
+```typescript
+import { Composio } from '@composio/core';
+import { ClaudeAgentSDKProvider } from '@composio/claude-agent-sdk';
+import { query, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+
+const composio = new Composio({
+  provider: new ClaudeAgentSDKProvider(),
+});
+
+// Get multiple tools
+const tools = await composio.tools.get('default', [
+  'GMAIL_SEND_EMAIL',
+  'GMAIL_LIST_EMAILS',
+  'SLACK_POST_MESSAGE',
+]);
+
+// Wrap tools and create MCP server
+const mcpServer = createSdkMcpServer({
+  name: 'composio',
+  version: '1.0.0',
+  tools,
+});
+
+// Execute query
+for await (const message of query({
+  prompt: 'Check my latest emails and post a summary to #general on Slack',
+  options: {
+    mcpServers: { composio: mcpServer },
+  },
+})) {
+  console.log(message);
+}
+```
+
+### Custom Server Configuration
+
+```typescript
+const provider = new ClaudeAgentSDKProvider({
+  serverName: 'my-composio-tools',
+  serverVersion: '2.0.0',
+});
+
+const composio = new Composio({
+  provider,
+});
+```
+
+### With Tool Router Session
+
+```typescript
+// Create a session for a specific user
+const session = await composio.toolRouter.createSession({
+  userId: 'user@example.com',
+});
+
+// Get tools from the session (automatically handles authentication)
+const tools = await session.tools(['GITHUB_CREATE_ISSUE', 'GITHUB_LIST_REPOS']);
+
+// Create MCP server with session tools
+const mcpServer = createSdkMcpServer({
+  name: 'github-tools',
+  version: '1.0.0',
+  tools,
+});
+
+for await (const content of query({
+  prompt: 'Create an issue in my top starred repo',
+  options: {
+    mcpServers: { github: mcpServer },
+  },
+})) {
+  if (content.type === 'assistant') {
+    console.log(content.message);
+  }
+}
+```
+
+## How It Works
+
+The Claude Agent SDK uses MCP (Model Context Protocol) servers to provide tools to Claude agents. This provider:
+
+1. **Converts** Composio tool definitions to MCP tool format
+2. **Creates** an in-process MCP server using `createSdkMcpServer()`
+3. **Handles** tool execution by routing calls through Composio's execution layer
+4. **Manages** authentication and connected accounts automatically
+
+<Info>
+The Claude Agent SDK provider is built on top of Composio's agentic provider base, which means it automatically handles tool wrapping and execution delegation.
+</Info>
+
+## Permission Modes
+
+The Claude Agent SDK supports different permission modes:
+
+```typescript
+for await (const content of query({
+  prompt: 'Send an email',
+  options: {
+    mcpServers: { composio: mcpServer },
+    permissionMode: 'ask', // 'ask' | 'bypassPermissions' | 'deny'
+  },
+})) {
+  // Handle response
+}
+```
+
+- **`ask`**: Ask for permission before executing tools (default)
+- **`bypassPermissions`**: Skip permission prompts (useful for automation)
+- **`deny`**: Deny all tool executions
+
+## Type Exports
+
+```typescript
+import type {
+  ClaudeAgentTool,
+  ClaudeAgentToolCollection,
+  ClaudeAgentOptions,
+} from '@composio/claude-agent-sdk';
+```
+
+<ParamField path="ClaudeAgentTool" type="type">
+  Type for a single Claude Agent SDK MCP tool definition
+</ParamField>
+
+<ParamField path="ClaudeAgentToolCollection" type="type">
+  Type for a collection of Claude Agent SDK MCP tools
+</ParamField>
+
+<ParamField path="ClaudeAgentOptions" type="type">
+  Options type from `@anthropic-ai/claude-agent-sdk`
+</ParamField>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Claude Agent SDK Docs" icon="book" href="https://platform.claude.com/docs/en/agent-sdk/overview">
+    Official Claude Agent SDK documentation
+  </Card>
+  <Card title="MCP Overview" icon="server" href="/typescript/advanced/mcp">
+    Learn about Model Context Protocol
+  </Card>
+  <Card title="Tool Router" icon="route" href="/typescript/advanced/tool-router">
+    Advanced tool routing and session management
+  </Card>
+  <Card title="Anthropic Provider" icon="brain" href="/typescript/providers/anthropic">
+    Standard Anthropic provider for Claude API
+  </Card>
+</CardGroup>
