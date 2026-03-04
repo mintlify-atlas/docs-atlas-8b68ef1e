@@ -1,0 +1,166 @@
+---
+title: composio whoami
+description: Display your Composio account information and authentication status
+---
+
+The `composio whoami` command displays your current authentication status and account information.
+
+## Usage
+
+```bash
+composio whoami
+```
+
+## Description
+
+Displays your global user context including:
+- User API key (redacted)
+- Default organization ID
+- Default project ID
+- Test user ID (if configured)
+
+## Examples
+
+### Check Authentication Status
+
+```bash
+composio whoami
+```
+
+**Output (when logged in):**
+
+```
+┌───────────────────────────────────────────────────────┐
+│ Global User Context                                   │
+├───────────────────────────────────────────────────────┤
+│ Global User API Key: ak_***aBc123                     │
+│ Default Org ID: k2OiqRLMdHyM                          │
+│ Default Project ID: pr_xlSR6oN5jIlk                   │
+│ Test User ID: not set                                 │
+└───────────────────────────────────────────────────────┘
+```
+
+**Output (when not logged in):**
+
+```
+⚠  You are not logged in yet. Please run `composio login`.
+```
+
+### Capture API Key in Scripts
+
+```bash
+# Extract API key from JSON output (piped mode)
+API_KEY=$(composio whoami 2>/dev/null | jq -r '.global_user_api_key')
+echo "API Key: $API_KEY"
+```
+
+**Piped output (stdout only):**
+
+```json
+{
+  "global_user_api_key": "uak_b813ydmoEYdB_xBxGHeW",
+  "default_org_id": "k2OiqRLMdHyM",
+  "default_project_id": "pr_xlSR6oN5jIlk",
+  "test_user_id": null
+}
+```
+
+<Note>
+  When piped or redirected, `composio whoami` outputs only structured JSON to stdout. All decoration (boxes, formatting) is suppressed.
+</Note>
+
+### Use in CI/CD
+
+```bash
+# Verify authentication before running other commands
+if composio whoami > /dev/null 2>&1; then
+  echo "Authenticated"
+  composio generate
+else
+  echo "Not authenticated. Run: composio login"
+  exit 1
+fi
+```
+
+## Output Fields
+
+<ResponseField name="global_user_api_key" type="string">
+  Your user API key. In interactive mode, this is redacted (e.g., `ak_***aBc123`). In piped mode, the full key is output.
+</ResponseField>
+
+<ResponseField name="default_org_id" type="string | null">
+  Your default organization ID. Set during `composio login`.
+</ResponseField>
+
+<ResponseField name="default_project_id" type="string | null">
+  Your default project nano ID (starts with `pr_`). Set during `composio login`.
+</ResponseField>
+
+<ResponseField name="test_user_id" type="string | null">
+  Test user ID for development/testing. Set during `composio login` if available.
+</ResponseField>
+
+## Configuration File
+
+The `whoami` command reads from `~/.composio/user-config.json`:
+
+```json
+{
+  "api_key": "uak_b813ydmoEYdB_xBxGHeW",
+  "base_url": "https://backend.composio.dev",
+  "web_url": "https://platform.composio.dev",
+  "org_id": "k2OiqRLMdHyM",
+  "project_id": "pr_xlSR6oN5jIlk",
+  "test_user_id": "pg-test-12345"
+}
+```
+
+You can also override these values with environment variables (see [Environment Variables](/cli/configuration/environment-variables)).
+
+## Interactive vs. Piped Output
+
+The CLI follows Unix conventions for composable output:
+
+### Interactive Mode (TTY)
+
+- **stdout:** Silent (no data output)
+- **stderr:** Decorated output with boxes and formatting
+- Human-readable display
+
+### Piped Mode (Not TTY)
+
+- **stdout:** Structured JSON only
+- **stderr:** Silent (all decoration suppressed)
+- Machine-readable for scripts
+
+**Example:**
+
+```bash
+# Interactive: shows decorated box on screen
+composio whoami
+
+# Piped: captures clean JSON
+composio whoami | jq
+
+# File redirect: writes clean JSON
+composio whoami > account.json
+
+# Command substitution: captures clean JSON
+ORG_ID=$(composio whoami | jq -r '.default_org_id')
+```
+
+## Related Commands
+
+- [`composio login`](/cli/commands/login) - Authenticate with Composio
+- [`composio version`](/cli/commands/version) - Display CLI version
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="login" icon="right-to-bracket" href="/cli/commands/login">
+    Authenticate with Composio
+  </Card>
+  <Card title="Environment Variables" icon="gear" href="/cli/configuration/environment-variables">
+    Configure the CLI
+  </Card>
+</CardGroup>

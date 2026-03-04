@@ -1,0 +1,498 @@
+---
+title: Triggers API
+description: Manage webhook triggers and real-time event subscriptions
+---
+
+The `triggers` API manages webhook triggers that notify your application when events occur in connected services. Triggers enable real-time integrations without polling.
+
+## Methods
+
+### listActive()
+
+List all active trigger instances.
+
+```typescript
+async listActive(
+  query?: TriggerInstanceListActiveParams
+): Promise<TriggerInstanceListActiveResponse>
+```
+
+<ParamField path="query" type="TriggerInstanceListActiveParams" optional>
+  <Expandable title="properties">
+    <ParamField path="authConfigIds" type="string[]">
+      Filter by auth config IDs
+    </ParamField>
+    <ParamField path="connectedAccountIds" type="string[]">
+      Filter by connected account IDs
+    </ParamField>
+    <ParamField path="triggerIds" type="string[]">
+      Filter by trigger IDs
+    </ParamField>
+    <ParamField path="triggerNames" type="string[]">
+      Filter by trigger names
+    </ParamField>
+    <ParamField path="showDisabled" type="boolean">
+      Include disabled triggers
+    </ParamField>
+    <ParamField path="cursor" type="string">
+      Pagination cursor
+    </ParamField>
+    <ParamField path="limit" type="number">
+      Maximum results
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Example:**
+
+```typescript
+const triggers = await composio.triggers.listActive({
+  connectedAccountIds: ['conn_abc123'],
+  limit: 20
+});
+
+triggers.items.forEach(trigger => {
+  console.log(trigger.triggerId, trigger.triggerSlug);
+});
+```
+
+### create()
+
+Create a new trigger instance for a user.
+
+```typescript
+async create(
+  userId: string,
+  slug: string,
+  body?: TriggerInstanceUpsertParams
+): Promise<TriggerInstanceUpsertResponse>
+```
+
+<ParamField path="userId" type="string" required>
+  User ID to create trigger for
+</ParamField>
+
+<ParamField path="slug" type="string" required>
+  Trigger slug (e.g., `GITHUB_PULL_REQUEST_EVENT`)
+</ParamField>
+
+<ParamField path="body" type="TriggerInstanceUpsertParams" optional>
+  <Expandable title="properties">
+    <ParamField path="connectedAccountId" type="string">
+      Specific connected account to use. If not provided, uses the first available.
+    </ParamField>
+    <ParamField path="triggerConfig" type="Record<string, unknown>">
+      Trigger-specific configuration
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Basic trigger">
+    ```typescript
+    const trigger = await composio.triggers.create(
+      'user_123',
+      'GITHUB_PULL_REQUEST_EVENT'
+    );
+
+    console.log('Trigger created:', trigger.triggerId);
+    ```
+  </Tab>
+  <Tab title="With config">
+    ```typescript
+    const trigger = await composio.triggers.create(
+      'user_123',
+      'SLACK_RECEIVE_MESSAGE',
+      {
+        triggerConfig: {
+          channel: '#alerts',
+          keywords: ['error', 'critical']
+        }
+      }
+    );
+    ```
+  </Tab>
+  <Tab title="Specific account">
+    ```typescript
+    const trigger = await composio.triggers.create(
+      'user_123',
+      'GMAIL_NEW_EMAIL_RECEIVED',
+      {
+        connectedAccountId: 'conn_abc123'
+      }
+    );
+    ```
+  </Tab>
+</Tabs>
+
+### update()
+
+Update an existing trigger instance.
+
+```typescript
+async update(
+  triggerId: string,
+  body: TriggerInstanceManageUpdateParams
+): Promise<TriggerInstanceManageUpdateResponse>
+```
+
+**Example:**
+
+```typescript
+await composio.triggers.update('trigger_abc123', {
+  status: 'enable'
+});
+```
+
+### delete()
+
+Delete a trigger instance.
+
+```typescript
+async delete(triggerId: string): Promise<TriggerInstanceManageDeleteResponse>
+```
+
+**Example:**
+
+```typescript
+await composio.triggers.delete('trigger_abc123');
+console.log('Trigger deleted');
+```
+
+### enable() / disable()
+
+Enable or disable a trigger instance.
+
+```typescript
+async enable(triggerId: string): Promise<TriggerInstanceUpsertResponse>
+async disable(triggerId: string): Promise<TriggerInstanceUpsertResponse>
+```
+
+**Example:**
+
+```typescript
+// Temporarily disable a trigger
+await composio.triggers.disable('trigger_abc123');
+
+// Re-enable it later
+await composio.triggers.enable('trigger_abc123');
+```
+
+### listTypes()
+
+List all available trigger types.
+
+```typescript
+async listTypes(query?: TriggersTypeListParams): Promise<TriggersTypeListResponse>
+```
+
+<ParamField path="query" type="TriggersTypeListParams" optional>
+  <Expandable title="properties">
+    <ParamField path="toolkits" type="string[]">
+      Filter by toolkit slugs
+    </ParamField>
+    <ParamField path="cursor" type="string">
+      Pagination cursor
+    </ParamField>
+    <ParamField path="limit" type="number">
+      Maximum results
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Example:**
+
+```typescript
+const triggerTypes = await composio.triggers.listTypes({
+  toolkits: ['github', 'slack']
+});
+
+triggerTypes.items.forEach(type => {
+  console.log(type.slug, type.description);
+});
+```
+
+### getType()
+
+Retrieve a specific trigger type.
+
+```typescript
+async getType(slug: string): Promise<TriggersTypeRetrieveResponse>
+```
+
+**Example:**
+
+```typescript
+const triggerType = await composio.triggers.getType('GITHUB_PULL_REQUEST_EVENT');
+
+console.log(triggerType.name); // "Pull Request Event"
+console.log(triggerType.description); // "Triggered when..."
+console.log(triggerType.inputSchema); // Configuration schema
+```
+
+### subscribe()
+
+Subscribe to trigger events via Pusher.
+
+```typescript
+async subscribe(
+  fn: (data: IncomingTriggerPayload) => void,
+  filters?: TriggerSubscribeParams
+): Promise<void>
+```
+
+<ParamField path="fn" type="function" required>
+  Callback function to handle trigger events
+</ParamField>
+
+<ParamField path="filters" type="TriggerSubscribeParams" optional>
+  <Expandable title="properties">
+    <ParamField path="toolkits" type="string[]">
+      Filter by toolkit slugs
+    </ParamField>
+    <ParamField path="triggerId" type="string">
+      Specific trigger ID
+    </ParamField>
+    <ParamField path="connectedAccountId" type="string">
+      Specific connected account
+    </ParamField>
+    <ParamField path="triggerSlug" type="string[]">
+      Filter by trigger slugs
+    </ParamField>
+    <ParamField path="userId" type="string">
+      Filter by user ID
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Subscribe to all triggers">
+    ```typescript
+    await composio.triggers.subscribe((data) => {
+      console.log('Trigger received:', data.triggerSlug);
+      console.log('Payload:', data.payload);
+    });
+    ```
+  </Tab>
+  <Tab title="Filter by toolkit">
+    ```typescript
+    await composio.triggers.subscribe(
+      (data) => {
+        console.log('GitHub event:', data.triggerSlug);
+        console.log('Data:', data.payload);
+      },
+      { toolkits: ['github'] }
+    );
+    ```
+  </Tab>
+  <Tab title="Filter by user">
+    ```typescript
+    await composio.triggers.subscribe(
+      (data) => {
+        console.log('User event:', data);
+      },
+      { userId: 'user_123' }
+    );
+    ```
+  </Tab>
+</Tabs>
+
+### unsubscribe()
+
+Unsubscribe from trigger events.
+
+```typescript
+async unsubscribe(): Promise<void>
+```
+
+**Example:**
+
+```typescript
+// Subscribe to triggers
+await composio.triggers.subscribe((data) => {
+  console.log('Trigger:', data);
+});
+
+// Later, unsubscribe
+await composio.triggers.unsubscribe();
+```
+
+### verifyWebhook()
+
+Verify an incoming webhook payload and signature.
+
+```typescript
+async verifyWebhook(params: VerifyWebhookParams): Promise<VerifyWebhookResult>
+```
+
+<ParamField path="params" type="VerifyWebhookParams" required>
+  <Expandable title="properties">
+    <ParamField path="payload" type="string" required>
+      Raw webhook payload (request body)
+    </ParamField>
+    <ParamField path="signature" type="string" required>
+      Value from `webhook-signature` header
+    </ParamField>
+    <ParamField path="id" type="string" required>
+      Value from `webhook-id` header
+    </ParamField>
+    <ParamField path="timestamp" type="string" required>
+      Value from `webhook-timestamp` header
+    </ParamField>
+    <ParamField path="secret" type="string" required>
+      Your webhook secret from Composio dashboard
+    </ParamField>
+    <ParamField path="tolerance" type="number" default={300}>
+      Maximum webhook age in seconds (0 to disable)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Express.js">
+    ```typescript
+    import express from 'express';
+
+    const app = express();
+
+    app.post('/webhook',
+      express.raw({ type: 'application/json' }),
+      async (req, res) => {
+        try {
+          const result = await composio.triggers.verifyWebhook({
+            payload: req.body.toString(),
+            signature: req.headers['webhook-signature'] as string,
+            id: req.headers['webhook-id'] as string,
+            timestamp: req.headers['webhook-timestamp'] as string,
+            secret: process.env.COMPOSIO_WEBHOOK_SECRET!
+          });
+
+          console.log('Webhook version:', result.version);
+          console.log('Trigger:', result.payload.triggerSlug);
+          console.log('Data:', result.payload.payload);
+
+          res.status(200).send('OK');
+        } catch (error) {
+          console.error('Webhook verification failed:', error);
+          res.status(401).send('Unauthorized');
+        }
+      }
+    );
+    ```
+  </Tab>
+  <Tab title="Next.js API Route">
+    ```typescript
+    // app/api/webhook/route.ts
+    import { NextRequest, NextResponse } from 'next/server';
+
+    export async function POST(request: NextRequest) {
+      const payload = await request.text();
+
+      try {
+        const result = await composio.triggers.verifyWebhook({
+          payload,
+          signature: request.headers.get('webhook-signature')!,
+          id: request.headers.get('webhook-id')!,
+          timestamp: request.headers.get('webhook-timestamp')!,
+          secret: process.env.COMPOSIO_WEBHOOK_SECRET!
+        });
+
+        // Process the verified webhook
+        console.log('Trigger:', result.payload.triggerSlug);
+
+        return NextResponse.json({ success: true });
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Verification failed' },
+          { status: 401 }
+        );
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Types
+
+### IncomingTriggerPayload
+
+```typescript
+interface IncomingTriggerPayload {
+  id: string; // Trigger instance ID
+  uuid: string; // Unique event ID
+  triggerSlug: string; // Trigger type (e.g., GITHUB_PULL_REQUEST_EVENT)
+  toolkitSlug: string; // Toolkit that fired the trigger
+  userId: string; // User ID
+  payload: Record<string, unknown>; // Event data
+  originalPayload: Record<string, unknown>; // Raw event from service
+  metadata: {
+    id: string;
+    uuid: string;
+    triggerSlug: string;
+    toolkitSlug: string;
+    triggerConfig: Record<string, unknown>;
+    connectedAccount: {
+      id: string;
+      uuid: string;
+      authConfigId: string;
+      userId: string;
+      status: string;
+    };
+  };
+}
+```
+
+### VerifyWebhookResult
+
+```typescript
+interface VerifyWebhookResult {
+  version: 'V1' | 'V2' | 'V3'; // Webhook format version
+  payload: IncomingTriggerPayload; // Parsed trigger data
+  rawPayload: WebhookPayload; // Original webhook payload
+}
+```
+
+## Common Triggers
+
+### GitHub
+
+- `GITHUB_PULL_REQUEST_EVENT` - PR opened, closed, or updated
+- `GITHUB_COMMIT_EVENT` - New commits pushed
+- `GITHUB_ISSUE_EVENT` - Issues created or updated
+- `GITHUB_STAR_ADDED` - Repository starred
+
+### Slack
+
+- `SLACK_RECEIVE_MESSAGE` - Message posted to channel
+- `SLACK_RECEIVE_REACTION` - Reaction added to message
+- `SLACK_CHANNEL_CREATED` - New channel created
+
+### Gmail
+
+- `GMAIL_NEW_EMAIL_RECEIVED` - New email received
+- `GMAIL_NEW_LABELED_EMAIL` - Email labeled
+
+## Best Practices
+
+1. **Webhook Verification**: Always verify webhooks in production
+2. **Error Handling**: Handle trigger failures gracefully
+3. **Idempotency**: Use `uuid` to prevent duplicate processing
+4. **Filtering**: Use filters to reduce unnecessary events
+5. **Unsubscribe**: Clean up subscriptions when done
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up user authentication
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Execute tools from triggers
+  </Card>
+  <Card title="Toolkits" icon="box" href="/typescript/api/toolkits">
+    Browse available toolkits
+  </Card>
+  <Card title="Auth Configs" icon="key" href="/typescript/api/auth-configs">
+    Configure authentication
+  </Card>
+</CardGroup>

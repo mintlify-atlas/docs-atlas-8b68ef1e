@@ -1,0 +1,196 @@
+---
+title: Toolkits
+description: Manage and organize collections of tools
+---
+
+Toolkits are collections of related tools grouped by service (e.g., GitHub, Slack, Gmail). The `Toolkits` class provides methods to list, retrieve, and authorize toolkits.
+
+## Accessing Toolkits
+
+```python
+from composio import Composio
+
+composio = Composio()
+toolkits_api = composio.toolkits
+```
+
+## Methods
+
+### get
+
+Retrieve toolkit information.
+
+```python
+# Get a specific toolkit
+github = composio.toolkits.get("github")
+
+# Get all toolkits
+all_toolkits = composio.toolkits.get()
+
+# Get toolkits with query
+toolkits = composio.toolkits.get(query={"category": "productivity"})
+```
+
+<ParamField path="slug" type="str">
+  Toolkit slug to retrieve (e.g., `"github"`, `"slack"`).
+</ParamField>
+
+<ParamField path="query" type="dict">
+  Query parameters for filtering toolkits.
+</ParamField>
+
+### list
+
+List all available toolkits with filtering and pagination.
+
+```python
+toolkits = composio.toolkits.list(
+    category="productivity",
+    limit=20,
+    sort_by="usage"
+)
+```
+
+<ParamField path="category" type="str">
+  Filter by toolkit category.
+</ParamField>
+
+<ParamField path="cursor" type="str">
+  Pagination cursor.
+</ParamField>
+
+<ParamField path="limit" type="float">
+  Maximum number of results.
+</ParamField>
+
+<ParamField path="sort_by" type="Literal['usage', 'alphabetically']">
+  Sort order for results.
+</ParamField>
+
+<ParamField path="managed_by" type="Literal['composio', 'all', 'project']">
+  Filter by management type.
+</ParamField>
+
+### list_categories
+
+List all toolkit categories.
+
+```python
+categories = composio.toolkits.list_categories()
+for category in categories:
+    print(category)
+```
+
+### authorize
+
+Authorize a user to use a toolkit (creates connected account).
+
+```python
+connection_request = composio.toolkits.authorize(
+    user_id="user_123",
+    toolkit="github"
+)
+
+print(f"Redirect URL: {connection_request.redirect_url}")
+
+# Wait for user to complete OAuth flow
+connected_account = connection_request.wait_for_connection()
+```
+
+<ParamField path="user_id" type="str" required>
+  The user ID to authorize.
+</ParamField>
+
+<ParamField path="toolkit" type="str" required>
+  Toolkit slug to authorize.
+</ParamField>
+
+### get_connected_account_initiation_fields
+
+Get required fields for connecting an account.
+
+```python
+fields = composio.toolkits.get_connected_account_initiation_fields(
+    toolkit="github",
+    auth_scheme="OAUTH2",
+    required_only=True
+)
+```
+
+### get_auth_config_creation_fields
+
+Get required fields for creating an auth config.
+
+```python
+fields = composio.toolkits.get_auth_config_creation_fields(
+    toolkit="github",
+    auth_scheme="OAUTH2"
+)
+```
+
+## Examples
+
+### List All Toolkits
+
+```python
+toolkits = composio.toolkits.list()
+
+for toolkit in toolkits.items:
+    print(f"{toolkit.name}: {toolkit.slug}")
+```
+
+### Get Toolkit Details
+
+```python
+github = composio.toolkits.get("github")
+
+print(f"Name: {github.name}")
+print(f"Description: {github.description}")
+print(f"Logo: {github.logo}")
+```
+
+### Authorize User for Toolkit
+
+```python
+# Initiate authorization
+connection = composio.toolkits.authorize(
+    user_id="user_123",
+    toolkit="github"
+)
+
+# Redirect user to this URL
+print(f"Please visit: {connection.redirect_url}")
+
+# Wait for connection (with timeout)
+try:
+    account = connection.wait_for_connection(timeout=300)
+    print(f"Successfully connected: {account.id}")
+except ComposioSDKTimeoutError:
+    print("Connection timeout")
+```
+
+### Filter by Category
+
+```python
+productivity_tools = composio.toolkits.list(
+    category="productivity",
+    limit=10
+)
+
+for toolkit in productivity_tools.items:
+    print(f"- {toolkit.name}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tools" icon="wrench" href="/python/api/tools">
+    Get tools from toolkits
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/python/api/connected-accounts">
+    Manage connections
+  </Card>
+  <Card title="Auth Configs" icon="key" href="/python/api/auth-configs">
+    Configure authentication
+  </Card>
+</CardGroup>

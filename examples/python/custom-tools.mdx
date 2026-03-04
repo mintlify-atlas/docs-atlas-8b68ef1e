@@ -1,0 +1,405 @@
+---
+title: Python Custom Tools Example
+description: Create custom tools in Python with Composio using decorators and type hints
+---
+
+This example demonstrates how to create custom tools in Python using Composio's decorator-based API with Pydantic models for type safety.
+
+## Overview
+
+In this example, you'll learn how to:
+- Create custom tools using the `@composio.tools.custom_tool` decorator
+- Define input schemas with Pydantic models
+- Create standalone tools and toolkit-integrated tools
+- Access authentication credentials in tools
+- Make authenticated API requests
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    pip install composio pydantic requests
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Create a `.env` file with your API key:
+    ```bash
+    COMPOSIO_API_KEY=your_composio_api_key
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```python
+import requests
+from pydantic import BaseModel, Field
+from composio import Composio
+from composio.types import ExecuteRequestFn
+
+composio = Composio()
+
+# Example 1: Simple standalone tool
+class AddTwoNumbersInput(BaseModel):
+    a: int = Field(
+        ...,
+        description="The first number to add",
+    )
+    b: int = Field(
+        ...,
+        description="The second number to add",
+    )
+
+@composio.tools.custom_tool
+def add_two_numbers(request: AddTwoNumbersInput) -> int:
+    """Add two numbers."""
+    return request.a + request.b
+
+# Example 2: Toolkit-integrated tool with API access
+class GetIssueInfoInput(BaseModel):
+    issue_number: int = Field(
+        ...,
+        description="The number of the issue to get information about",
+    )
+
+@composio.tools.custom_tool(toolkit="github")
+def get_issue_info(
+    request: GetIssueInfoInput,
+    execute_request: ExecuteRequestFn,
+    auth_credentials: dict,
+) -> dict:
+    """Get information about a GitHub issue."""
+    response = execute_request(
+        endpoint=f"/repos/composiohq/composio/issues/{request.issue_number}",
+        method="GET",
+        parameters=[
+            {
+                "name": "Accept",
+                "value": "application/vnd.github.v3+json",
+                "type": "header",
+            },
+            {
+                "name": "Authorization",
+                "value": f"Bearer {auth_credentials['access_token']}",
+                "type": "header",
+            },
+        ],
+    )
+    return {"data": response.data}
+
+# Example 3: Direct HTTP requests
+@composio.tools.custom_tool(toolkit="github")
+def get_issue_info_direct(
+    request: GetIssueInfoInput,
+    execute_request: ExecuteRequestFn,
+    auth_credentials: dict,
+) -> dict:
+    """Get information about a GitHub issue."""
+    response = requests.get(
+        f"https://api.github.com/repos/composiohq/composio/issues/{request.issue_number}",
+        headers={
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": f"Bearer {auth_credentials['access_token']}",
+        },
+    )
+    return {"data": response.json()}
+
+# Execute the custom tool
+response = composio.tools.execute(
+    user_id="default",
+    slug=get_issue_info.slug,
+    arguments={"issue_number": 1},
+)
+
+print(response)
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Define Input Schema">
+    Create a Pydantic `BaseModel` class that defines the input parameters. Use `Field` to add descriptions and validation.
+    
+    ```python
+    class AddTwoNumbersInput(BaseModel):
+        a: int = Field(..., description="The first number to add")
+        b: int = Field(..., description="The second number to add")
+    ```
+  </Step>
+
+  <Step title="Decorate Tool Function">
+    Use `@composio.tools.custom_tool` to register your function as a tool. Optionally specify a toolkit for authentication.
+    
+    ```python
+    @composio.tools.custom_tool(toolkit="github")
+    def my_tool(request: MyInput) -> dict:
+        # Implementation
+        pass
+    ```
+  </Step>
+
+  <Step title="Implement Tool Logic">
+    Write the tool's logic. For toolkit-integrated tools, you can access `execute_request` and `auth_credentials`.
+  </Step>
+
+  <Step title="Execute the Tool">
+    Call `composio.tools.execute()` with the tool's slug and arguments to run it.
+  </Step>
+</Steps>
+
+## Tool Function Signatures
+
+<CodeGroup>
+```python Standalone Tool
+@composio.tools.custom_tool
+def simple_tool(request: InputModel) -> ReturnType:
+    """Tool description."""
+    # Implementation
+    return result
+```
+
+```python Toolkit-Integrated Tool
+@composio.tools.custom_tool(toolkit="github")
+def toolkit_tool(
+    request: InputModel,
+    execute_request: ExecuteRequestFn,
+    auth_credentials: dict,
+) -> ReturnType:
+    """Tool description."""
+    # Can use execute_request for authenticated API calls
+    return result
+```
+</CodeGroup>
+
+## Function Parameters
+
+<ParamField path="request" type="BaseModel" required>
+  The validated input parameters matching your Pydantic model
+</ParamField>
+
+<ParamField path="execute_request" type="ExecuteRequestFn">
+  Helper function to make authenticated HTTP requests to the toolkit's API
+  
+  ```python
+  execute_request(
+      endpoint="/api/path",
+      method="GET" | "POST" | "PUT" | "DELETE",
+      parameters=[{
+          "name": "param_name",
+          "value": "param_value",
+          "type": "header" | "query" | "body",
+      }],
+  )
+  ```
+</ParamField>
+
+<ParamField path="auth_credentials" type="dict">
+  Authentication credentials for the toolkit
+  
+  ```python
+  {
+      "access_token": "...",
+      "refresh_token": "...",
+      # Other credentials depending on auth type
+  }
+  ```
+</ParamField>
+
+## Pydantic Field Options
+
+Use Pydantic's `Field` for rich parameter definitions:
+
+```python
+class MyToolInput(BaseModel):
+    required_field: str = Field(
+        ...,  # ... means required
+        description="Description for AI",
+    )
+    
+    optional_field: str = Field(
+        default="default_value",
+        description="Optional parameter",
+    )
+    
+    validated_field: int = Field(
+        ...,
+        ge=1,  # Greater than or equal to 1
+        le=100,  # Less than or equal to 100
+        description="Number between 1 and 100",
+    )
+    
+    email_field: str = Field(
+        ...,
+        pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$',
+        description="Valid email address",
+    )
+```
+
+## Expected Output
+
+```bash
+{
+    "successful": true,
+    "data": {
+        "number": 1,
+        "title": "Example Issue",
+        "state": "open",
+        "user": {
+            "login": "composiohq",
+            "id": 12345
+        },
+        "body": "Issue description..."
+    },
+    "error": null
+}
+```
+
+## Advanced Examples
+
+<AccordionGroup>
+  <Accordion title="Complex Data Structures">
+    Handle nested data with Pydantic models:
+    
+    ```python
+    class Address(BaseModel):
+        street: str
+        city: str
+        country: str
+    
+    class CreateUserInput(BaseModel):
+        name: str = Field(..., description="User's full name")
+        email: str = Field(..., description="User's email")
+        address: Address = Field(..., description="User's address")
+    
+    @composio.tools.custom_tool
+    def create_user(request: CreateUserInput) -> dict:
+        """Create a new user with address."""
+        return {
+            "user_id": "12345",
+            "name": request.name,
+            "address": request.address.dict(),
+        }
+    ```
+  </Accordion>
+
+  <Accordion title="List Parameters">
+    Accept lists of items:
+    
+    ```python
+    from typing import List
+    
+    class BatchProcessInput(BaseModel):
+        items: List[str] = Field(
+            ...,
+            description="List of items to process",
+        )
+        operation: str = Field(
+            ...,
+            description="Operation to perform",
+        )
+    
+    @composio.tools.custom_tool
+    def batch_process(request: BatchProcessInput) -> dict:
+        """Process multiple items."""
+        results = [f"{request.operation}: {item}" for item in request.items]
+        return {"results": results}
+    ```
+  </Accordion>
+
+  <Accordion title="Enum Parameters">
+    Use enums for restricted choices:
+    
+    ```python
+    from enum import Enum
+    
+    class Priority(str, Enum):
+        LOW = "low"
+        MEDIUM = "medium"
+        HIGH = "high"
+    
+    class CreateTaskInput(BaseModel):
+        title: str = Field(..., description="Task title")
+        priority: Priority = Field(
+            default=Priority.MEDIUM,
+            description="Task priority level",
+        )
+    
+    @composio.tools.custom_tool
+    def create_task(request: CreateTaskInput) -> dict:
+        """Create a task with priority."""
+        return {
+            "task": request.title,
+            "priority": request.priority.value,
+        }
+    ```
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    Handle errors gracefully:
+    
+    ```python
+    @composio.tools.custom_tool(toolkit="github")
+    def safe_get_issue(
+        request: GetIssueInfoInput,
+        execute_request: ExecuteRequestFn,
+        auth_credentials: dict,
+    ) -> dict:
+        """Get GitHub issue with error handling."""
+        try:
+            response = execute_request(
+                endpoint=f"/repos/composiohq/composio/issues/{request.issue_number}",
+                method="GET",
+                parameters=[
+                    {
+                        "name": "Authorization",
+                        "value": f"Bearer {auth_credentials['access_token']}",
+                        "type": "header",
+                    },
+                ],
+            )
+            return {"success": True, "data": response.data}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Tool Attributes
+
+After decoration, your function has additional attributes:
+
+```python
+@composio.tools.custom_tool
+def my_tool(request: MyInput) -> dict:
+    """My custom tool."""
+    pass
+
+print(my_tool.slug)  # Auto-generated slug
+print(my_tool.name)  # Tool name
+print(my_tool.description)  # From docstring
+```
+
+## Best Practices
+
+<Check>**Descriptive Docstrings**: Use clear docstrings - they become the tool description for AI models</Check>
+
+<Check>**Field Descriptions**: Always add descriptions to Pydantic fields for better AI understanding</Check>
+
+<Check>**Type Safety**: Use Pydantic's validation features to ensure type safety</Check>
+
+<Check>**Error Handling**: Return structured error responses instead of raising exceptions</Check>
+
+<Check>**Toolkit Integration**: Use toolkit parameter when you need authentication for external APIs</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Example" icon="brain" href="/examples/python/openai-basic">
+    Use custom tools with OpenAI Agents
+  </Card>
+  <Card title="CrewAI Example" icon="users" href="/examples/python/crewai">
+    Use custom tools in CrewAI crews
+  </Card>
+</CardGroup>

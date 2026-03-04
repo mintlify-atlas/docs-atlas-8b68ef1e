@@ -1,0 +1,72 @@
+---
+title: Cloudflare Provider
+description: Use Composio tools with Cloudflare Workers AI
+---
+
+The Cloudflare provider wraps Composio tools for use with Cloudflare Workers AI.
+
+## Installation
+
+```bash
+npm install @composio/cloudflare
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { CloudflareProvider } from '@composio/cloudflare';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new CloudflareProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+// In a Cloudflare Worker
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const ai = new Ai(env.AI);
+
+    const response = await ai.run('@cf/meta/llama-3-8b-instruct', {
+      messages: [
+        { role: 'user', content: 'Create a GitHub issue' }
+      ],
+      tools: Object.values(tools)
+    });
+
+    return new Response(JSON.stringify(response));
+  }
+};
+```
+
+## Tool Format
+
+```typescript
+interface CloudflareTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+  };
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Provider" icon="brain" href="/typescript/providers/openai">
+    Compare with OpenAI
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+</CardGroup>

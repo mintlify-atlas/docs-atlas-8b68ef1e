@@ -1,0 +1,23 @@
+---
+title: Gemini Provider
+description: Use Composio tools with Google Gemini
+---
+
+## Installation
+
+```bash
+pip install composio-gemini google-generativeai
+```
+
+## Usage
+
+```python
+from composio_gemini import GeminiProvider
+from composio import Composio
+
+composio = Composio(provider=GeminiProvider())
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with Gemini
+# ...
+```

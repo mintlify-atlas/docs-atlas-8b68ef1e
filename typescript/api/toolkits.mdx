@@ -1,0 +1,278 @@
+---
+title: Toolkits API
+description: Discover and manage toolkits (collections of tools)
+---
+
+The `toolkits` API provides methods to discover available toolkits and manage toolkit-specific configurations. Toolkits are collections of related tools grouped by service (e.g., `github`, `gmail`, `slack`).
+
+## Methods
+
+### get()
+
+Retrieve toolkit information.
+
+```typescript
+// Get a specific toolkit by slug
+async get(slug: string): Promise<ToolkitRetrieveResponse>
+
+// List all toolkits with filters
+async get(query?: ToolkitListParams): Promise<ToolKitListResponse>
+```
+
+<ParamField path="slug" type="string">
+  Toolkit identifier (e.g., `github`, `slack`)
+</ParamField>
+
+<ParamField path="query" type="ToolkitListParams" optional>
+  <Expandable title="properties">
+    <ParamField path="category" type="string">
+      Filter by category (e.g., `developer-tools`, `communication`)
+    </ParamField>
+    <ParamField path="managedBy" type="string">
+      Filter by management type
+    </ParamField>
+    <ParamField path="sortBy" type="string">
+      Sort results by field
+    </ParamField>
+    <ParamField path="cursor" type="string">
+      Pagination cursor
+    </ParamField>
+    <ParamField path="limit" type="number">
+      Maximum results per page
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Get specific toolkit">
+    ```typescript
+    const github = await composio.toolkits.get('github');
+
+    console.log(github.name); // "GitHub"
+    console.log(github.logo); // Logo URL
+    console.log(github.authConfigDetails); // Auth requirements
+    ```
+  </Tab>
+  <Tab title="List all toolkits">
+    ```typescript
+    const toolkits = await composio.toolkits.get({});
+
+    toolkits.items.forEach(toolkit => {
+      console.log(toolkit.slug, toolkit.name);
+    });
+    ```
+  </Tab>
+  <Tab title="Filter by category">
+    ```typescript
+    const devTools = await composio.toolkits.get({
+      category: 'developer-tools',
+      limit: 20
+    });
+
+    console.log(devTools.items); // [github, gitlab, bitbucket, ...]
+    ```
+  </Tab>
+</Tabs>
+
+### listCategories()
+
+Get all toolkit categories.
+
+```typescript
+async listCategories(): Promise<ToolkitRetrieveCategoriesResponse>
+```
+
+**Example:**
+
+```typescript
+const categories = await composio.toolkits.listCategories();
+
+categories.items.forEach(category => {
+  console.log(category.slug, category.name);
+});
+// Output:
+// developer-tools "Developer Tools"
+// communication "Communication"
+// productivity "Productivity"
+```
+
+### authorize()
+
+Authorize a user for a toolkit. Creates auth config if needed and initiates connection.
+
+```typescript
+async authorize(
+  userId: string,
+  toolkitSlug: string,
+  authConfigId?: string
+): Promise<ConnectionRequest>
+```
+
+<ParamField path="userId" type="string" required>
+  User ID to authorize
+</ParamField>
+
+<ParamField path="toolkitSlug" type="string" required>
+  Toolkit to authorize (e.g., `github`)
+</ParamField>
+
+<ParamField path="authConfigId" type="string" optional>
+  Specific auth config to use. If not provided, uses the first available.
+</ParamField>
+
+**Example:**
+
+```typescript
+const connectionRequest = await composio.toolkits.authorize('user_123', 'github');
+
+if (connectionRequest.redirectUrl) {
+  console.log(`Visit: ${connectionRequest.redirectUrl}`);
+  
+  // Wait for user to complete OAuth flow
+  const connection = await connectionRequest.waitForConnection();
+  console.log('Connected!', connection.id);
+}
+```
+
+### getAuthConfigCreationFields()
+
+Get required fields for creating an auth config.
+
+```typescript
+async getAuthConfigCreationFields(
+  toolkitSlug: string,
+  authScheme: AuthSchemeType,
+  options?: { requiredOnly?: boolean }
+): Promise<ToolkitAuthFieldsResponse>
+```
+
+<ParamField path="toolkitSlug" type="string" required>
+  Toolkit slug
+</ParamField>
+
+<ParamField path="authScheme" type="AuthSchemeType" required>
+  Auth type: `OAUTH2`, `API_KEY`, `BASIC`, etc.
+</ParamField>
+
+<ParamField path="options.requiredOnly" type="boolean" default={false}>
+  Return only required fields
+</ParamField>
+
+**Example:**
+
+```typescript
+const fields = await composio.toolkits.getAuthConfigCreationFields(
+  'github',
+  'OAUTH2',
+  { requiredOnly: true }
+);
+
+fields.forEach(field => {
+  console.log(field.name, field.type, field.description);
+});
+// Output:
+// client_id string "OAuth2 Client ID"
+// client_secret string "OAuth2 Client Secret"
+```
+
+### getConnectedAccountInitiationFields()
+
+Get required fields for initiating a connected account.
+
+```typescript
+async getConnectedAccountInitiationFields(
+  toolkitSlug: string,
+  authScheme: AuthSchemeType,
+  options?: { requiredOnly?: boolean }
+): Promise<ToolkitAuthFieldsResponse>
+```
+
+**Example:**
+
+```typescript
+const fields = await composio.toolkits.getConnectedAccountInitiationFields(
+  'github',
+  'OAUTH2'
+);
+
+console.log(fields); // Fields needed to initiate connection
+```
+
+## Types
+
+### ToolkitRetrieveResponse
+
+Detailed toolkit information.
+
+```typescript
+interface ToolkitRetrieveResponse {
+  slug: string; // Toolkit identifier
+  name: string; // Human-readable name
+  logo?: string; // Logo URL
+  description?: string; // What the toolkit provides
+  authConfigDetails?: AuthConfigDetail[]; // Auth requirements
+  categories?: string[]; // Categories this toolkit belongs to
+  isLocal?: boolean; // Local/managed toolkit
+  isDeprecated?: boolean; // Deprecated status
+}
+```
+
+### ToolKitListResponse
+
+Paginated list of toolkits.
+
+```typescript
+interface ToolKitListResponse {
+  items: ToolkitRetrieveResponse[];
+  nextCursor?: string; // Pagination cursor
+  totalPages?: number; // Total pages
+}
+```
+
+### AuthConfigDetail
+
+Authentication configuration details.
+
+```typescript
+interface AuthConfigDetail {
+  mode: AuthSchemeType; // OAUTH2, API_KEY, etc.
+  fields: {
+    authConfigCreation: {
+      required: Field[];
+      optional: Field[];
+    };
+    connectedAccountInitiation: {
+      required: Field[];
+      optional: Field[];
+    };
+  };
+}
+```
+
+## Common Categories
+
+| Category | Examples |
+|----------|----------|
+| `developer-tools` | GitHub, GitLab, Bitbucket |
+| `communication` | Slack, Discord, Microsoft Teams |
+| `productivity` | Notion, Asana, Trello |
+| `crm` | Salesforce, HubSpot |
+| `marketing` | Mailchimp, SendGrid |
+| `finance` | Stripe, QuickBooks |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Work with individual tools
+  </Card>
+  <Card title="Auth Configs" icon="key" href="/typescript/api/auth-configs">
+    Configure authentication
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Manage user connections
+  </Card>
+  <Card title="Installation" icon="download" href="/typescript/installation">
+    Get started with Composio
+  </Card>
+</CardGroup>

@@ -1,0 +1,97 @@
+---
+title: CLI Overview
+description: Introduction to the Composio CLI for managing tools, integrations, and code generation
+---
+
+The Composio CLI is a powerful command-line tool for managing your Composio projects, authenticating with the platform, and generating type-safe code for TypeScript and Python projects.
+
+## What is the Composio CLI?
+
+The Composio CLI provides a unified interface for:
+
+- **Authentication** - Securely log in and manage your Composio account
+- **Code Generation** - Generate type-safe toolkits, tools, and trigger definitions
+- **Project Management** - Manage organizations, projects, and connected accounts
+- **Tool Discovery** - Search and explore available tools and toolkits
+- **Self-Management** - Upgrade the CLI and check version information
+
+## Key Features
+
+### Type-Safe Code Generation
+
+Automatically generate TypeScript or Python type definitions for:
+- Toolkits (collections of related tools)
+- Tools (individual functions like GITHUB_CREATE_REPO, GMAIL_SEND_EMAIL)
+- Triggers (event listeners for external services)
+
+### Multi-Language Support
+
+The CLI auto-detects your project type and generates appropriate code:
+- **TypeScript** - Full type definitions with optional input/output schemas
+- **Python** - Type stubs for all toolkits and tools
+
+### Flexible Authentication
+
+- **Interactive browser login** - OAuth flow for easy authentication
+- **Non-interactive login** - API key support for CI/CD and automation
+- **Multi-tenant support** - Manage multiple organizations and projects
+
+### Performance & Offline Support
+
+- **File-based caching** - Cached API responses for faster subsequent runs
+- **Offline mode** - Generate code from cache when network is unavailable
+- **Parallel execution** - Concurrent API requests for improved performance
+
+## Architecture
+
+The CLI is built with:
+
+- **[Effect.ts](https://effect.website)** - Composable, type-safe runtime for TypeScript
+- **[Bun](https://bun.sh)** - Fast JavaScript runtime and bundler
+- **[@effect/cli](https://effect.website/docs/cli)** - Command-line framework with Effect
+- **[@clack/prompts](https://github.com/bombshell-dev/clack)** - Interactive terminal UI
+
+## Quick Start
+
+```bash
+# Install the CLI
+curl -fsSL https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh | bash
+
+# Login to Composio
+composio login
+
+# Generate types for your project
+composio generate
+
+# Check your account
+composio whoami
+```
+
+## Common Commands
+
+| Command | Description |
+|---------|-------------|
+| `composio login` | Log in to the Composio platform |
+| `composio whoami` | Display your account information |
+| `composio generate` | Auto-detect project type and generate types |
+| `composio ts generate` | Generate TypeScript type stubs |
+| `composio py generate` | Generate Python type stubs |
+| `composio upgrade` | Update the CLI to the latest version |
+| `composio version` | Display the current CLI version |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/cli/installation">
+    Learn how to install the Composio CLI on your system
+  </Card>
+  <Card title="Login Command" icon="right-to-bracket" href="/cli/commands/login">
+    Authenticate with the Composio platform
+  </Card>
+  <Card title="Generate Command" icon="code" href="/cli/commands/generate">
+    Generate type-safe code for your projects
+  </Card>
+  <Card title="Environment Variables" icon="gear" href="/cli/configuration/environment-variables">
+    Configure the CLI with environment variables
+  </Card>
+</CardGroup>

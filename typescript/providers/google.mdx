@@ -1,0 +1,165 @@
+---
+title: Google GenAI Provider
+description: Use Composio tools with Google's Gemini models
+---
+
+The Google provider wraps Composio tools for use with Google's GenAI SDK (Gemini).
+
+## Installation
+
+```bash
+npm install @composio/google @google/genai
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { GoogleProvider } from '@composio/google';
+import { GoogleGenerativeAI } from '@google/genai';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new GoogleProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const genAI = new GoogleGenerativeAI('your-google-api-key');
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+const result = await model.generateContent({
+  contents: [{ role: 'user', parts: [{ text: 'Create a GitHub issue' }] }],
+  tools: [{ functionDeclarations: tools }]
+});
+```
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { GoogleProvider } from '@composio/google';
+import { GoogleGenerativeAI } from '@google/genai';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new GoogleProvider()
+});
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+
+async function runAgent(userMessage: string) {
+  const tools = await composio.tools.get('default', {
+    toolkits: ['github']
+  });
+
+  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+  const chat = model.startChat({
+    tools: [{ functionDeclarations: tools }]
+  });
+
+  let result = await chat.sendMessage(userMessage);
+  const provider = new GoogleProvider();
+
+  while (result.response.candidates?.[0].content.parts.some(
+    part => 'functionCall' in part
+  )) {
+    const parts = result.response.candidates[0].content.parts;
+    
+    for (const part of parts) {
+      if ('functionCall' in part) {
+        const toolResult = await provider.executeToolCall(
+          'default',
+          {
+            name: part.functionCall.name,
+            args: part.functionCall.args
+          }
+        );
+
+        result = await chat.sendMessage([
+          {
+            functionResponse: {
+              name: part.functionCall.name,
+              response: JSON.parse(toolResult)
+            }
+          }
+        ]);
+      }
+    }
+  }
+
+  return result.response.text();
+}
+
+const answer = await runAgent('Create a GitHub issue');
+console.log(answer);
+```
+
+## Streaming
+
+```typescript
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+const result = await model.generateContentStream({
+  contents: [{ role: 'user', parts: [{ text: 'Create an issue' }] }],
+  tools: [{ functionDeclarations: tools }]
+});
+
+for await (const chunk of result.stream) {
+  const text = chunk.text();
+  if (text) {
+    process.stdout.write(text);
+  }
+}
+```
+
+## Tool Format
+
+```typescript
+interface GoogleTool {
+  name: string; // Tool slug
+  description: string; // Tool description
+  parameters: {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required: string[];
+  };
+}
+```
+
+## Best Practices
+
+1. **Model Selection**: Use gemini-pro for function calling
+2. **Error Handling**: Handle function call errors
+3. **Streaming**: Use streaming for better UX
+4. **Safety Settings**: Configure safety settings as needed
+5. **Token Limits**: Be aware of context limits
+
+## TypeScript Types
+
+```typescript
+import type { FunctionDeclaration } from '@google/genai';
+
+type GoogleTool = FunctionDeclaration;
+type GoogleGenAIToolCollection = GoogleTool[];
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Provider" icon="brain" href="/typescript/providers/openai">
+    Compare with OpenAI
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up authentication
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View examples
+  </Card>
+</CardGroup>

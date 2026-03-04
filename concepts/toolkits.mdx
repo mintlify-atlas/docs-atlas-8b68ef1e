@@ -1,0 +1,312 @@
+---
+title: Toolkits
+description: Learn how to work with toolkits in the Composio SDK
+---
+
+# Toolkits
+
+Toolkits are collections of related tools grouped by service or functionality. For example, the GitHub toolkit contains all GitHub-related tools like creating repositories, managing issues, and handling pull requests.
+
+## Overview
+
+The `Toolkits` class manages toolkit operations in the Composio SDK. Toolkits serve as a replacement for the "apps" concept in the Composio API, providing a more organized way to access tools.
+
+**Source:** `ts/packages/core/src/models/Toolkits.ts`
+
+## Retrieving Toolkits
+
+### Get a Specific Toolkit
+
+Retrieve detailed information about a single toolkit:
+
+```typescript
+// Get a specific toolkit by slug
+const githubToolkit = await composio.toolkits.get('github');
+console.log(githubToolkit.name); // GitHub
+console.log(githubToolkit.authConfigDetails); // Authentication configuration details
+```
+
+### List All Toolkits
+
+Retrieve all available toolkits:
+
+```typescript
+// Get all toolkits
+const allToolkits = await composio.toolkits.get({});
+```
+
+### Filter Toolkits by Category
+
+Toolkits are organized into categories for easier discovery:
+
+```typescript
+// Get toolkits by category
+const devToolkits = await composio.toolkits.get({
+  category: 'developer-tools'
+});
+
+// Get local toolkits
+const localToolkits = await composio.toolkits.get({
+  isLocal: true
+});
+```
+
+### Pagination
+
+Handle large toolkit lists with pagination:
+
+```typescript
+// Get toolkits with pagination
+const toolkits = await composio.toolkits.get({
+  limit: 20,
+  cursor: 'next_page_cursor'
+});
+```
+
+## Toolkit Categories
+
+Retrieve all available toolkit categories:
+
+```typescript
+// Get all toolkit categories
+const categories = await composio.toolkits.listCategories();
+console.log(categories.items); // Array of category objects
+```
+
+Categories help organize toolkits by their primary function, such as:
+- Communication (Slack, Discord, Email)
+- Developer Tools (GitHub, GitLab, Jira)
+- Productivity (Google Calendar, Notion, Trello)
+- CRM (Salesforce, HubSpot)
+- And many more
+
+## Authentication Fields
+
+### Get Auth Config Creation Fields
+
+Retrieve the fields required to create an auth config for a toolkit:
+
+```typescript
+import { AuthSchemeTypes } from '@composio/core';
+
+// Get all required and optional fields
+const fields = await composio.toolkits.getAuthConfigCreationFields(
+  'github',
+  AuthSchemeTypes.OAUTH2
+);
+
+// Get only required fields
+const requiredFields = await composio.toolkits.getAuthConfigCreationFields(
+  'github',
+  AuthSchemeTypes.OAUTH2,
+  { requiredOnly: true }
+);
+
+console.log(requiredFields);
+// Example output:
+// [
+//   {
+//     name: 'client_id',
+//     type: 'string',
+//     description: 'OAuth client ID',
+//     required: true
+//   },
+//   {
+//     name: 'client_secret',
+//     type: 'string',
+//     description: 'OAuth client secret',
+//     required: true
+//   }
+// ]
+```
+
+### Get Connected Account Initiation Fields
+
+Retrieve the fields required to initiate a connected account:
+
+```typescript
+import { AuthSchemeTypes } from '@composio/core';
+
+// Get all fields for connected account initiation
+const fields = await composio.toolkits.getConnectedAccountInitiationFields(
+  'github',
+  AuthSchemeTypes.OAUTH2
+);
+
+// Get only required fields
+const requiredFields = await composio.toolkits.getConnectedAccountInitiationFields(
+  'github',
+  AuthSchemeTypes.OAUTH2,
+  { requiredOnly: true }
+);
+```
+
+<Note>
+If a toolkit has multiple authentication schemes, you should specify the `authScheme` parameter. If not specified, the SDK will use the first available authentication scheme and log a warning.
+</Note>
+
+## Authorizing Toolkits
+
+The `authorize` method provides a convenient way to connect a user to a toolkit:
+
+```typescript
+// Authorize a user to use a toolkit
+const connectionRequest = await composio.toolkits.authorize('user_123', 'github');
+
+// With a specific auth config
+const connectionRequest = await composio.toolkits.authorize(
+  'user_123',
+  'github',
+  'auth_config_abc'
+);
+```
+
+### How Authorization Works
+
+1. Checks if an auth config exists for the toolkit
+2. If not found and an `authConfigId` is provided, uses that
+3. If no auth config exists, creates one using Composio-managed authentication
+4. Creates a connection request for the user
+5. Returns a `ConnectionRequest` object
+
+<Info>
+The `authorize` method automatically allows multiple connected accounts per user for an auth config. If you need different behavior, use the `connectedAccounts.initiate()` method directly.
+</Info>
+
+### Example: Complete Authorization Flow
+
+```typescript
+// Authorize and wait for connection
+const connectionRequest = await composio.toolkits.authorize('user_123', 'github');
+
+if (connectionRequest.redirectUrl) {
+  console.log(`Visit: ${connectionRequest.redirectUrl}`);
+  
+  // Wait for the user to complete authentication
+  const connectedAccount = await connectionRequest.waitForConnection();
+  console.log(`Connected: ${connectedAccount.id}`);
+}
+```
+
+## Toolkit Properties
+
+Every toolkit object contains:
+
+- `slug` - Unique identifier (e.g., 'github')
+- `name` - Human-readable name (e.g., 'GitHub')
+- `description` - Toolkit description
+- `logo` - Toolkit logo URL
+- `categories` - Array of categories the toolkit belongs to
+- `authConfigDetails` - Available authentication schemes and their requirements
+- `isLocal` - Whether the toolkit runs locally
+- `isDeprecated` - Whether the toolkit is deprecated
+- `documentation` - Link to toolkit documentation
+
+### Authentication Config Details
+
+The `authConfigDetails` property contains information about available authentication methods:
+
+```typescript
+const toolkit = await composio.toolkits.get('github');
+
+toolkit.authConfigDetails.forEach(authConfig => {
+  console.log(authConfig.mode); // e.g., 'OAUTH2', 'API_KEY', 'BASIC'
+  console.log(authConfig.fields.authConfigCreation.required); // Required fields
+  console.log(authConfig.fields.authConfigCreation.optional); // Optional fields
+  console.log(authConfig.fields.connectedAccountInitiation.required); // Required for connection
+});
+```
+
+## Advanced Filtering
+
+Combine multiple filters to find specific toolkits:
+
+```typescript
+// Get toolkits managed by a specific provider
+const toolkits = await composio.toolkits.get({
+  managedBy: 'composio'
+});
+
+// Sort toolkits
+const sortedToolkits = await composio.toolkits.get({
+  sortBy: 'name', // or 'created_at', 'updated_at'
+  limit: 50
+});
+```
+
+## Error Handling
+
+Common errors when working with toolkits:
+
+- `ComposioToolkitNotFoundError` - Toolkit with the given slug doesn't exist
+- `ComposioToolkitFetchError` - Error fetching toolkits from the API
+- `ComposioAuthConfigNotFoundError` - No auth config found for the toolkit
+- `ValidationError` - Invalid parameters passed to toolkit methods
+
+### Example Error Handling
+
+```typescript
+import { ComposioToolkitNotFoundError } from '@composio/core';
+
+try {
+  const toolkit = await composio.toolkits.get('nonexistent-toolkit');
+} catch (error) {
+  if (error instanceof ComposioToolkitNotFoundError) {
+    console.error('Toolkit not found:', error.message);
+    console.log('Available toolkits can be listed with toolkits.get({})');
+  } else {
+    throw error;
+  }
+}
+```
+
+## Use Cases
+
+### Discover Available Tools for a Service
+
+```typescript
+// Get GitHub toolkit and list its tools
+const githubToolkit = await composio.toolkits.get('github');
+const githubTools = await composio.tools.getRawComposioTools({
+  toolkits: ['github']
+});
+
+console.log(`${githubToolkit.name} has ${githubTools.length} tools`);
+```
+
+### Check Authentication Requirements
+
+```typescript
+// Check what authentication is needed for a toolkit
+const toolkit = await composio.toolkits.get('slack');
+
+if (toolkit.authConfigDetails && toolkit.authConfigDetails.length > 0) {
+  console.log('Authentication schemes available:');
+  toolkit.authConfigDetails.forEach(auth => {
+    console.log(`- ${auth.mode}`);
+  });
+} else {
+  console.log('No authentication required');
+}
+```
+
+### Browse Toolkits by Category
+
+```typescript
+// Get all categories and their toolkits
+const categories = await composio.toolkits.listCategories();
+
+for (const category of categories.items) {
+  const toolkits = await composio.toolkits.get({
+    category: category.slug
+  });
+  
+  console.log(`${category.name}: ${toolkits.items.length} toolkits`);
+}
+```
+
+## Related Resources
+
+- [Tools](/concepts/tools) - Individual actions within toolkits
+- [Authentication](/concepts/authentication) - Configure authentication for toolkits
+- [Connected Accounts](/concepts/connected-accounts) - User connections to toolkits

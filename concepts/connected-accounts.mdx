@@ -1,0 +1,379 @@
+---
+title: Connected Accounts
+description: Learn how to manage user connections to third-party services
+---
+
+# Connected Accounts
+
+Connected accounts represent authenticated user connections to third-party services. They store credentials and authentication state, enabling users to execute tools on external platforms like GitHub, Slack, or Gmail.
+
+## Overview
+
+The `ConnectedAccounts` class manages user authentication and connections to external services in the Composio SDK. Each connected account links a user to a specific toolkit through an authentication configuration.
+
+**Source:** `ts/packages/core/src/models/ConnectedAccounts.ts`
+
+## Creating Connected Accounts
+
+### Initiate a Connection
+
+The `initiate` method creates a new connected account and returns a connection request:
+
+```typescript
+import { AuthScheme } from '@composio/core';
+
+// For OAuth2 authentication
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  'auth_config_123',
+  {
+    callbackUrl: 'https://your-app.com/callback',
+    config: AuthScheme.OAuth2({
+      access_token: 'your_access_token',
+      token_type: 'Bearer'
+    })
+  }
+);
+
+// For API Key authentication
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  'auth_config_123',
+  {
+    config: AuthScheme.ApiKey({
+      api_key: 'your_api_key'
+    })
+  }
+);
+
+// For Basic authentication
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  'auth_config_123',
+  {
+    config: AuthScheme.Basic({
+      username: 'your_username',
+      password: 'your_password'
+    })
+  }
+);
+```
+
+<Note>
+By default, `initiate` prevents creating multiple connected accounts for the same user and auth config. Set `allowMultiple: true` in options to override this behavior.
+</Note>
+
+### Create a Composio Connect Link
+
+Generate an external link for users to authenticate:
+
+```typescript
+// Create a connection request and redirect the user to the redirect url
+const connectionRequest = await composio.connectedAccounts.link(
+  'user_123',
+  'auth_config_123'
+);
+const redirectUrl = connectionRequest.redirectUrl;
+console.log(`Visit: ${redirectUrl} to authenticate your account`);
+
+// Wait for the connection to be established
+const connectedAccount = await connectionRequest.waitForConnection();
+
+// With custom callback URL
+const connectionRequest = await composio.connectedAccounts.link(
+  'user_123',
+  'auth_config_123',
+  {
+    callbackUrl: 'https://your-app.com/callback'
+  }
+);
+```
+
+### Wait for Connection
+
+Poll for connection completion:
+
+```typescript
+// Wait for a connection to complete with default timeout (60 seconds)
+const connectedAccount = await composio.connectedAccounts.waitForConnection(
+  'conn_123abc'
+);
+
+// Wait with a custom timeout of 2 minutes
+const connectedAccount = await composio.connectedAccounts.waitForConnection(
+  'conn_123abc',
+  120000
+);
+```
+
+<Info>
+The `waitForConnection` method continuously polls the API until the connection becomes active, fails, or times out. Terminal states include: ACTIVE, FAILED, EXPIRED, and DELETED.
+</Info>
+
+## Listing Connected Accounts
+
+### List All Connected Accounts
+
+```typescript
+// List all connected accounts
+const allAccounts = await composio.connectedAccounts.list();
+```
+
+### Filter by User
+
+```typescript
+// List accounts for a specific user
+const userAccounts = await composio.connectedAccounts.list({
+  userIds: ['user123']
+});
+```
+
+### Filter by Toolkit
+
+```typescript
+// List accounts for a specific toolkit
+const githubAccounts = await composio.connectedAccounts.list({
+  toolkitSlugs: ['github']
+});
+```
+
+### Filter by Status
+
+```typescript
+import { ConnectedAccountStatuses } from '@composio/core';
+
+// List only active accounts
+const activeAccounts = await composio.connectedAccounts.list({
+  statuses: [ConnectedAccountStatuses.ACTIVE]
+});
+```
+
+### Combine Filters
+
+```typescript
+// List active GitHub accounts for a user
+const accounts = await composio.connectedAccounts.list({
+  userIds: ['user123'],
+  toolkitSlugs: ['github'],
+  statuses: [ConnectedAccountStatuses.ACTIVE]
+});
+```
+
+### Pagination
+
+```typescript
+// List with pagination
+const accounts = await composio.connectedAccounts.list({
+  limit: 20,
+  cursor: 'next_page_cursor',
+  orderBy: 'created_at' // or 'updated_at'
+});
+```
+
+## Retrieving a Connected Account
+
+Get detailed information about a specific connected account:
+
+```typescript
+// Get a connected account by ID
+const account = await composio.connectedAccounts.get('conn_abc123');
+console.log(account.status); // e.g., 'ACTIVE'
+console.log(account.toolkit.slug); // e.g., 'github'
+console.log(account.userId); // e.g., 'user_123'
+```
+
+## Managing Connected Accounts
+
+### Refresh Credentials
+
+Refresh OAuth tokens or other credentials:
+
+```typescript
+// Refresh a connected account's credentials
+const refreshedAccount = await composio.connectedAccounts.refresh('conn_abc123');
+
+// Refresh with options
+const refreshedAccount = await composio.connectedAccounts.refresh(
+  'conn_abc123',
+  {
+    redirectUrl: 'https://your-app.com/callback',
+    validateCredentials: true
+  }
+);
+```
+
+<Tip>
+Refreshing credentials is useful when OAuth tokens expire. The SDK will attempt to use the refresh token to obtain new access tokens.
+</Tip>
+
+### Enable/Disable Accounts
+
+```typescript
+// Enable a previously disabled connected account
+const enabledAccount = await composio.connectedAccounts.enable('conn_abc123');
+console.log(enabledAccount.isDisabled); // false
+
+// Disable a connected account
+const disabledAccount = await composio.connectedAccounts.disable('conn_abc123');
+console.log(disabledAccount.isDisabled); // true
+```
+
+### Update Account Status
+
+Update with additional context:
+
+```typescript
+// Disable with a reason
+const disabledAccount = await composio.connectedAccounts.updateStatus(
+  'conn_abc123',
+  {
+    enabled: false,
+    reason: 'Token expired'
+  }
+);
+
+// Enable an account
+const updatedAccount = await composio.connectedAccounts.updateStatus(
+  'conn_abc123',
+  {
+    enabled: true
+  }
+);
+```
+
+### Delete a Connected Account
+
+<Note>
+Deleting a connected account is permanent and cannot be undone. It will revoke any access tokens associated with the account.
+</Note>
+
+```typescript
+// Delete a connected account
+await composio.connectedAccounts.delete('conn_abc123');
+```
+
+## Connected Account Properties
+
+Every connected account object contains:
+
+- `id` - Unique identifier for the connected account
+- `userId` - The external user ID
+- `status` - Current status (INITIATED, ACTIVE, FAILED, EXPIRED, DELETED)
+- `toolkit` - Information about the connected toolkit
+- `authConfig` - Authentication configuration details
+- `state` - Authentication state and credentials (encrypted)
+- `isDisabled` - Whether the account is disabled
+- `createdAt` - When the account was created
+- `updatedAt` - When the account was last updated
+
+### Connection Status
+
+Possible status values:
+
+- `INITIATED` - Connection process started, waiting for user authentication
+- `ACTIVE` - Successfully connected and authenticated
+- `FAILED` - Authentication failed
+- `EXPIRED` - Connection expired (credentials no longer valid)
+- `DELETED` - Connection was deleted
+
+## Complete Connection Flow Example
+
+```typescript
+import { Composio, ConnectedAccountStatuses } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-api-key' });
+
+// Step 1: Create a connection link
+const connectionRequest = await composio.connectedAccounts.link(
+  'user_123',
+  'auth_config_github',
+  {
+    callbackUrl: 'https://myapp.com/oauth/callback'
+  }
+);
+
+// Step 2: Redirect user to authenticate
+console.log(`Redirect user to: ${connectionRequest.redirectUrl}`);
+
+// Step 3: Wait for connection (in your callback handler or polling)
+try {
+  const connectedAccount = await connectionRequest.waitForConnection(120000);
+  
+  if (connectedAccount.status === ConnectedAccountStatuses.ACTIVE) {
+    console.log('Successfully connected!');
+    console.log('Connected Account ID:', connectedAccount.id);
+  }
+} catch (error) {
+  console.error('Connection failed:', error.message);
+}
+
+// Step 4: Use the connected account to execute tools
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'user_123',
+  connectedAccountId: connectedAccount.id,
+  arguments: { owner: 'composio' }
+});
+```
+
+## Multiple Accounts Per User
+
+Allow users to connect multiple accounts for the same service:
+
+```typescript
+// Allow multiple GitHub accounts for the same user
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  'auth_config_github',
+  {
+    allowMultiple: true,
+    config: AuthScheme.OAuth2({ /* credentials */ })
+  }
+);
+```
+
+<Info>
+When `allowMultiple` is true, the SDK will allow creating multiple connected accounts for the same user and auth config combination. This is useful when users need to manage multiple GitHub organizations or Slack workspaces.
+</Info>
+
+## Error Handling
+
+Common errors when working with connected accounts:
+
+- `ComposioConnectedAccountNotFoundError` - Connected account doesn't exist
+- `ComposioMultipleConnectedAccountsError` - Multiple accounts exist and `allowMultiple` is false
+- `ComposioFailedToCreateConnectedAccountLink` - Failed to create connection link
+- `ConnectionRequestFailedError` - Connection entered a failed state
+- `ConnectionRequestTimeoutError` - Connection didn't complete within timeout
+- `ValidationError` - Invalid parameters passed to methods
+
+### Example Error Handling
+
+```typescript
+import {
+  ComposioConnectedAccountNotFoundError,
+  ComposioMultipleConnectedAccountsError
+} from '@composio/core';
+
+try {
+  const connectionRequest = await composio.connectedAccounts.initiate(
+    'user_123',
+    'auth_config_123'
+  );
+} catch (error) {
+  if (error instanceof ComposioMultipleConnectedAccountsError) {
+    console.log('User already has a connected account');
+    console.log('Use allowMultiple: true to create another');
+  } else if (error instanceof ComposioConnectedAccountNotFoundError) {
+    console.log('Connected account not found');
+  } else {
+    throw error;
+  }
+}
+```
+
+## Related Resources
+
+- [Authentication](/concepts/authentication) - Configure authentication methods
+- [Toolkits](/concepts/toolkits) - Services that connected accounts authenticate with
+- [Tools](/concepts/tools) - Execute tools using connected accounts
+- [Providers](/concepts/providers) - Use connected accounts with AI frameworks

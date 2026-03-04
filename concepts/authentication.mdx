@@ -1,0 +1,423 @@
+---
+title: Authentication
+description: Learn how to configure and manage authentication in the Composio SDK
+---
+
+# Authentication
+
+Authentication configurations (Auth Configs) define how users authenticate with third-party services in the Composio SDK. They specify the authentication method, required credentials, and permissions needed to connect to external platforms.
+
+## Overview
+
+The `AuthConfigs` class manages authentication configurations that control how connected accounts authenticate with toolkits. Auth configs support various authentication schemes including OAuth2, API keys, and basic authentication.
+
+**Source:** `ts/packages/core/src/models/AuthConfigs.ts`
+
+## Authentication Schemes
+
+Composio supports multiple authentication schemes:
+
+- `OAUTH2` - OAuth 2.0 authentication
+- `OAUTH1` - OAuth 1.0 authentication
+- `API_KEY` - API key-based authentication
+- `BASIC` - Basic username/password authentication
+- `BEARER_TOKEN` - Bearer token authentication
+- `NO_AUTH` - No authentication required
+
+## Listing Auth Configs
+
+### List All Auth Configs
+
+```typescript
+// List all auth configs
+const allConfigs = await composio.authConfigs.list();
+```
+
+### Filter by Toolkit
+
+```typescript
+// List auth configs for a specific toolkit
+const githubConfigs = await composio.authConfigs.list({
+  toolkit: 'github'
+});
+```
+
+### Filter by Management Type
+
+```typescript
+// List Composio-managed auth configs
+const managedConfigs = await composio.authConfigs.list({
+  isComposioManaged: true
+});
+
+// List custom auth configs
+const customConfigs = await composio.authConfigs.list({
+  isComposioManaged: false
+});
+```
+
+### Pagination
+
+```typescript
+// List with pagination
+const configs = await composio.authConfigs.list({
+  limit: 20,
+  cursor: 'next_page_cursor'
+});
+```
+
+## Creating Auth Configs
+
+### Composio-Managed Authentication
+
+Use Composio's built-in OAuth apps (recommended for quick setup):
+
+```typescript
+import { AuthConfigTypes } from '@composio/core';
+
+const authConfig = await composio.authConfigs.create('github', {
+  type: 'use_composio_managed_auth',
+  name: 'GitHub Auth Config'
+});
+
+console.log('Auth Config ID:', authConfig.id);
+```
+
+<Info>
+Composio-managed authentication uses Composio's pre-configured OAuth applications, making it easy to get started without registering your own OAuth apps.
+</Info>
+
+### Custom Authentication
+
+Use your own credentials and OAuth apps:
+
+```typescript
+import { AuthSchemeTypes } from '@composio/core';
+
+// OAuth2 with custom credentials
+const authConfig = await composio.authConfigs.create('github', {
+  type: 'use_custom_auth',
+  name: 'My GitHub OAuth App',
+  authScheme: AuthSchemeTypes.OAUTH2,
+  credentials: {
+    client_id: 'your_client_id',
+    client_secret: 'your_client_secret',
+    scopes: ['repo', 'user']
+  }
+});
+
+// API Key authentication
+const authConfig = await composio.authConfigs.create('custom-api', {
+  type: 'use_custom_auth',
+  name: 'Custom API Key Auth',
+  authScheme: AuthSchemeTypes.API_KEY,
+  credentials: {
+    api_key: 'your_api_key'
+  }
+});
+
+// Basic authentication
+const authConfig = await composio.authConfigs.create('custom-service', {
+  type: 'use_custom_auth',
+  name: 'Basic Auth Config',
+  authScheme: AuthSchemeTypes.BASIC,
+  credentials: {
+    username: 'your_username',
+    password: 'your_password'
+  }
+});
+```
+
+### Advanced Configuration Options
+
+```typescript
+// With tool access restrictions
+const authConfig = await composio.authConfigs.create('github', {
+  type: 'use_custom_auth',
+  name: 'Limited GitHub Access',
+  authScheme: AuthSchemeTypes.OAUTH2,
+  credentials: {
+    client_id: 'your_client_id',
+    client_secret: 'your_client_secret'
+  },
+  toolAccessConfig: {
+    toolsForConnectedAccountCreation: ['GITHUB_GET_USER'],
+    toolsAvailableForExecution: ['GITHUB_GET_REPOS', 'GITHUB_CREATE_ISSUE']
+  },
+  isEnabledForToolRouter: true
+});
+
+// With proxy configuration
+const authConfig = await composio.authConfigs.create('custom-api', {
+  type: 'use_custom_auth',
+  name: 'Proxied API Access',
+  authScheme: AuthSchemeTypes.API_KEY,
+  credentials: {
+    api_key: 'your_api_key'
+  },
+  proxyConfig: {
+    proxyUrl: 'https://proxy.example.com',
+    proxyAuthKey: 'proxy_auth_key'
+  }
+});
+```
+
+<Tip>
+`toolAccessConfig.toolsForConnectedAccountCreation` specifies which tools can be used during the connection creation process, while `toolsAvailableForExecution` restricts which tools can be executed using this auth config.
+</Tip>
+
+## Retrieving Auth Configs
+
+Get detailed information about a specific auth config:
+
+```typescript
+// Get an auth config by ID
+const authConfig = await composio.authConfigs.get('auth_abc123');
+console.log(authConfig.name); // e.g., 'GitHub Auth'
+console.log(authConfig.toolkit.slug); // e.g., 'github'
+console.log(authConfig.authScheme); // e.g., 'OAUTH2'
+```
+
+## Updating Auth Configs
+
+### Update Custom Auth Config
+
+```typescript
+// Update credentials for a custom auth config
+const updatedConfig = await composio.authConfigs.update('auth_abc123', {
+  type: 'custom',
+  credentials: {
+    api_key: 'new-api-key-value'
+  }
+});
+
+// Update tool access restrictions
+const updatedConfig = await composio.authConfigs.update('auth_abc123', {
+  type: 'custom',
+  credentials: {
+    client_id: 'existing_client_id',
+    client_secret: 'existing_client_secret'
+  },
+  toolAccessConfig: {
+    toolsAvailableForExecution: ['GITHUB_GET_REPOS', 'GITHUB_GET_USER']
+  }
+});
+```
+
+### Update Default Auth Config
+
+```typescript
+// Update scopes for a default auth config
+const updatedConfig = await composio.authConfigs.update('auth_abc123', {
+  type: 'default',
+  scopes: ['read:user', 'repo', 'write:org']
+});
+
+// Enable for tool router
+const updatedConfig = await composio.authConfigs.update('auth_abc123', {
+  type: 'default',
+  scopes: ['read:user'],
+  isEnabledForToolRouter: true
+});
+```
+
+<Note>
+The update type ('custom' or 'default') determines which fields can be modified. Custom auth configs allow credential updates, while default configs allow scope modifications.
+</Note>
+
+## Managing Auth Config Status
+
+### Enable/Disable Auth Configs
+
+```typescript
+// Enable an auth config
+await composio.authConfigs.enable('auth_abc123');
+
+// Disable an auth config
+await composio.authConfigs.disable('auth_abc123');
+```
+
+### Update Status Explicitly
+
+```typescript
+// Disable an auth config
+await composio.authConfigs.updateStatus('DISABLED', 'auth_abc123');
+
+// Enable an auth config
+await composio.authConfigs.updateStatus('ENABLED', 'auth_abc123');
+```
+
+<Info>
+When an auth config is disabled, it cannot be used to create new connected accounts or authenticate with third-party services. Existing connections may continue to work.
+</Info>
+
+## Deleting Auth Configs
+
+<Note>
+Deleting an auth config is permanent and cannot be undone. It will prevent any connected accounts using this auth config from functioning.
+</Note>
+
+```typescript
+// Delete an auth config
+await composio.authConfigs.delete('auth_abc123');
+```
+
+## Auth Config Properties
+
+Every auth config object contains:
+
+- `id` - Unique identifier for the auth config
+- `name` - Human-readable name
+- `toolkit` - Associated toolkit information
+- `authScheme` - Authentication scheme type (OAUTH2, API_KEY, etc.)
+- `isComposioManaged` - Whether it uses Composio's managed authentication
+- `isEnabled` - Current status (enabled/disabled)
+- `isEnabledForToolRouter` - Whether it can be used with tool router
+- `scopes` - OAuth scopes (for OAuth-based configs)
+- `createdAt` - Creation timestamp
+- `updatedAt` - Last update timestamp
+
+## Complete Authentication Flow
+
+```typescript
+import { Composio, AuthSchemeTypes } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-api-key' });
+
+// Step 1: Create an auth config
+const authConfig = await composio.authConfigs.create('github', {
+  type: 'use_custom_auth',
+  name: 'My GitHub App',
+  authScheme: AuthSchemeTypes.OAUTH2,
+  credentials: {
+    client_id: process.env.GITHUB_CLIENT_ID,
+    client_secret: process.env.GITHUB_CLIENT_SECRET,
+    scopes: ['repo', 'user']
+  }
+});
+
+console.log('Created auth config:', authConfig.id);
+
+// Step 2: Create a connected account using the auth config
+const connectionRequest = await composio.connectedAccounts.link(
+  'user_123',
+  authConfig.id
+);
+
+console.log('Redirect user to:', connectionRequest.redirectUrl);
+
+// Step 3: Wait for user to complete authentication
+const connectedAccount = await connectionRequest.waitForConnection();
+
+console.log('Successfully connected:', connectedAccount.id);
+
+// Step 4: Execute tools using the connected account
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'user_123',
+  connectedAccountId: connectedAccount.id,
+  arguments: { owner: 'composio' }
+});
+```
+
+## Tool Access Control
+
+Restrict which tools can be used with an auth config:
+
+```typescript
+// Create auth config with tool restrictions
+const authConfig = await composio.authConfigs.create('github', {
+  type: 'use_custom_auth',
+  name: 'Read-only GitHub Access',
+  authScheme: AuthSchemeTypes.OAUTH2,
+  credentials: {
+    client_id: 'your_client_id',
+    client_secret: 'your_client_secret',
+    scopes: ['repo:read']
+  },
+  toolAccessConfig: {
+    // Only these tools can be used during connection creation
+    toolsForConnectedAccountCreation: ['GITHUB_GET_USER'],
+    // Only these tools can be executed
+    toolsAvailableForExecution: [
+      'GITHUB_GET_REPOS',
+      'GITHUB_GET_ISSUES',
+      'GITHUB_GET_USER'
+    ]
+  }
+});
+```
+
+## Best Practices
+
+### Security
+
+- Never hardcode credentials - use environment variables
+- Rotate credentials regularly
+- Use the minimum required OAuth scopes
+- Enable auth configs only when needed
+- Delete unused auth configs
+
+### Organization
+
+- Use descriptive names for auth configs
+- Create separate auth configs for different environments (dev, staging, prod)
+- Document the purpose and scope of each auth config
+
+### Example: Environment-Based Auth Configs
+
+```typescript
+const environment = process.env.NODE_ENV || 'development';
+
+const authConfig = await composio.authConfigs.create('github', {
+  type: 'use_custom_auth',
+  name: `GitHub Auth - ${environment.toUpperCase()}`,
+  authScheme: AuthSchemeTypes.OAUTH2,
+  credentials: {
+    client_id: process.env[`GITHUB_CLIENT_ID_${environment.toUpperCase()}`],
+    client_secret: process.env[`GITHUB_CLIENT_SECRET_${environment.toUpperCase()}`],
+    scopes: environment === 'production' ? ['repo'] : ['repo', 'delete_repo']
+  }
+});
+```
+
+## Error Handling
+
+Common errors when working with auth configs:
+
+- `ComposioAuthConfigNotFoundError` - Auth config doesn't exist
+- `ValidationError` - Invalid parameters or credentials format
+- API errors (400) - Invalid configuration or missing required fields
+- API errors (404) - Toolkit or auth config not found
+
+### Example Error Handling
+
+```typescript
+import { ComposioAuthConfigNotFoundError, ValidationError } from '@composio/core';
+
+try {
+  const authConfig = await composio.authConfigs.create('github', {
+    type: 'use_custom_auth',
+    name: 'GitHub Auth',
+    authScheme: AuthSchemeTypes.OAUTH2,
+    credentials: {
+      client_id: 'invalid',
+      client_secret: 'invalid'
+    }
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Invalid auth config parameters:', error.message);
+  } else if (error.status === 400) {
+    console.error('API rejected the auth config:', error.message);
+  } else {
+    throw error;
+  }
+}
+```
+
+## Related Resources
+
+- [Connected Accounts](/concepts/connected-accounts) - Use auth configs to create connections
+- [Toolkits](/concepts/toolkits) - Services that require authentication
+- [Tools](/concepts/tools) - Execute authenticated operations
+- [Providers](/concepts/providers) - Integrate with AI frameworks

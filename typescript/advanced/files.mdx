@@ -1,0 +1,237 @@
+---
+title: Files API
+description: Upload and download files for tool execution
+---
+
+The Files API handles file uploads and downloads for tools that work with files. It's automatically used when `autoUploadDownloadFiles` is enabled (default).
+
+## Automatic File Handling
+
+By default, Composio automatically handles file uploads and downloads:
+
+```typescript
+const composio = new Composio({
+  apiKey: 'your-key',
+  autoUploadDownloadFiles: true // Default
+});
+
+// Files are automatically uploaded before tool execution
+const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+  userId: 'default',
+  arguments: {
+    file: '/path/to/document.pdf', // Automatically uploaded
+    folderId: 'folder_123'
+  }
+});
+
+// Files are automatically downloaded after tool execution
+console.log(result.data.downloadedFile); // Local file path
+```
+
+## Manual File Upload
+
+### upload()
+
+Manually upload a file:
+
+```typescript
+const fileData = await composio.files.upload({
+  file: '/path/to/document.pdf', // Local file path or File object
+  toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+  toolkitSlug: 'google_drive'
+});
+
+console.log('Uploaded:', fileData);
+// {
+//   url: 's3://...',
+//   name: 'document.pdf',
+//   mimeType: 'application/pdf',
+//   size: 1024000
+// }
+```
+
+<ParamField path="file" type="File | string" required>
+  File object or path to local file
+</ParamField>
+
+<ParamField path="toolSlug" type="string" required>
+  Tool that will use the file
+</ParamField>
+
+<ParamField path="toolkitSlug" type="string" required>
+  Toolkit the tool belongs to
+</ParamField>
+
+## Manual File Download
+
+### download()
+
+Manually download a file:
+
+```typescript
+const fileData = await composio.files.download({
+  s3Url: 's3://bucket/key',
+  toolSlug: 'GOOGLE_DRIVE_DOWNLOAD',
+  mimeType: 'application/pdf'
+});
+
+console.log('Downloaded:', fileData);
+// {
+//   path: '/tmp/downloaded-file.pdf',
+//   content: Buffer,
+//   mimeType: 'application/pdf'
+// }
+```
+
+<ParamField path="s3Url" type="string" required>
+  S3 URL of the file to download
+</ParamField>
+
+<ParamField path="toolSlug" type="string" required>
+  Tool that downloaded the file
+</ParamField>
+
+<ParamField path="mimeType" type="string" required>
+  MIME type of the file
+</ParamField>
+
+## Disabling Automatic Handling
+
+Disable automatic file handling for manual control:
+
+```typescript
+const composio = new Composio({
+  apiKey: 'your-key',
+  autoUploadDownloadFiles: false
+});
+
+// Now you must manually handle files
+const fileData = await composio.files.upload({
+  file: '/path/to/file.pdf',
+  toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+  toolkitSlug: 'google_drive'
+});
+
+const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+  userId: 'default',
+  arguments: {
+    fileUrl: fileData.url, // Use uploaded file URL
+    folderId: 'folder_123'
+  }
+});
+```
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { readFileSync } from 'fs';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  autoUploadDownloadFiles: true
+});
+
+async function uploadAndShare() {
+  // Automatic upload
+  const uploadResult = await composio.tools.execute(
+    'GOOGLE_DRIVE_UPLOAD',
+    {
+      userId: 'default',
+      arguments: {
+        file: './report.pdf', // Automatically uploaded
+        folderId: 'root'
+      }
+    }
+  );
+
+  console.log('Uploaded file ID:', uploadResult.data.fileId);
+
+  // Download a file
+  const downloadResult = await composio.tools.execute(
+    'GOOGLE_DRIVE_DOWNLOAD',
+    {
+      userId: 'default',
+      arguments: {
+        fileId: uploadResult.data.fileId
+      }
+    }
+  );
+
+  // File is automatically downloaded
+  console.log('Downloaded to:', downloadResult.data.filePath);
+}
+
+awaituploadAndShare();
+```
+
+## Supported File Operations
+
+### Upload Tools
+
+- `GOOGLE_DRIVE_UPLOAD`
+- `DROPBOX_UPLOAD_FILE`
+- `SLACK_UPLOAD_FILE`
+- `GMAIL_SEND_EMAIL` (with attachments)
+
+### Download Tools
+
+- `GOOGLE_DRIVE_DOWNLOAD`
+- `DROPBOX_DOWNLOAD_FILE`
+- `SLACK_GET_FILE`
+- `GMAIL_GET_ATTACHMENT`
+
+## File Types
+
+### FileUploadData
+
+```typescript
+interface FileUploadData {
+  url: string; // S3 URL
+  name: string; // File name
+  mimeType: string; // MIME type
+  size: number; // Size in bytes
+}
+```
+
+### FileDownloadData
+
+```typescript
+interface FileDownloadData {
+  path: string; // Local file path
+  content: Buffer; // File content
+  mimeType: string; // MIME type
+}
+```
+
+## Best Practices
+
+1. **Auto Handling**: Use automatic file handling for simplicity
+2. **File Cleanup**: Clean up downloaded files after use
+3. **Error Handling**: Handle upload/download failures
+4. **Size Limits**: Be aware of file size limits
+5. **Temporary Files**: Use temp directories for downloads
+
+## Platform Support
+
+File operations are supported in:
+
+- ✅ Node.js
+- ✅ Bun
+- ❌ Browser (use File objects)
+- ❌ Cloudflare Workers (no filesystem)
+- ⚠️ Deno (with --allow-read/--allow-write)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Platform Support" icon="server" href="/typescript/advanced/platform-support">
+    Runtime compatibility
+  </Card>
+  <Card title="Composio Class" icon="code" href="/typescript/api/composio">
+    Main SDK reference
+  </Card>
+</CardGroup>

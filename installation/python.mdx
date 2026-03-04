@@ -1,0 +1,222 @@
+---
+title: Python SDK Installation
+description: Install and set up the Composio Python SDK in your project
+---
+
+## Installation
+
+Install the Composio Python SDK using your preferred package manager:
+
+<CodeGroup>
+
+```bash pip
+pip install composio
+```
+
+```bash poetry
+poetry add composio
+```
+
+</CodeGroup>
+
+## Requirements
+
+- **Python**: Version 3.9 or higher (Python 3.10+ recommended)
+- **pip**: Latest version recommended
+
+## Environment Setup
+
+<Steps>
+
+<Step title="Get your API key">
+  Sign up at [composio.dev](https://composio.dev) and obtain your API key from the dashboard.
+</Step>
+
+<Step title="Configure environment variables">
+  Create a `.env` file in your project root and add your API key:
+
+  ```bash
+  COMPOSIO_API_KEY=your-api-key-here
+  COMPOSIO_BASE_URL=https://backend.composio.dev/api  # Optional: Custom API base URL
+  COMPOSIO_LOG_LEVEL=info                              # Optional: silent, error, warn, info, debug
+  COMPOSIO_DISABLE_TELEMETRY=false                     # Optional: Set to "true" to disable telemetry
+  ```
+
+  <Note>
+    For production applications, use a secure method to manage environment variables such as python-dotenv or your deployment platform's secret management.
+  </Note>
+</Step>
+
+<Step title="Initialize the SDK">
+  Import and initialize the Composio SDK in your application:
+
+  ```python
+  import os
+  from composio import Composio
+
+  composio = Composio(
+      api_key=os.getenv("COMPOSIO_API_KEY"),
+  )
+  ```
+</Step>
+
+</Steps>
+
+## Verification
+
+Verify your installation by running a simple test:
+
+```python
+import os
+from composio import Composio
+
+composio = Composio(
+    api_key=os.getenv("COMPOSIO_API_KEY"),
+)
+
+# Test the connection
+def verify():
+    try:
+        user_id = "test-user"
+        tools = composio.tools.get(user_id=user_id, toolkits=["HACKERNEWS"])
+        print(f"Successfully connected! Found {len(tools)} tools.")
+    except Exception as error:
+        print(f"Connection failed: {error}")
+
+verify()
+```
+
+## Provider-Specific Packages
+
+Depending on your AI framework, you may want to install a provider-specific package:
+
+<CodeGroup>
+
+```bash OpenAI
+pip install composio-openai
+```
+
+```bash OpenAI Agents
+pip install composio-openai-agents
+```
+
+```bash Anthropic
+pip install composio-anthropic
+```
+
+```bash LangChain
+pip install composio-langchain
+```
+
+```bash LangGraph
+pip install composio-langgraph
+```
+
+```bash LlamaIndex
+pip install composio-llamaindex
+```
+
+```bash CrewAI
+pip install composio-crewai
+```
+
+```bash AutoGen
+pip install composio-autogen
+```
+
+```bash Google Gemini
+pip install composio-gemini
+```
+
+```bash Google ADK
+pip install composio-google-adk
+```
+
+</CodeGroup>
+
+## Quick Start Example
+
+Here's a complete example using OpenAI Agents:
+
+<Steps>
+
+<Step title="Install dependencies">
+  ```bash
+  pip install composio-openai-agents openai-agents
+  ```
+</Step>
+
+<Step title="Create your agent">
+  ```python
+  import asyncio
+  import os
+  from agents import Agent, Runner
+  from composio import Composio
+  from composio_openai_agents import OpenAIAgentsProvider
+
+  # Initialize Composio client with OpenAI Agents Provider
+  composio = Composio(provider=OpenAIAgentsProvider())
+
+  user_id = "user@acme.org"
+  tools = composio.tools.get(user_id=user_id, toolkits=["HACKERNEWS"])
+
+  # Create an agent with the tools
+  agent = Agent(
+      name="Hackernews Agent",
+      instructions="You are a helpful assistant.",
+      tools=tools,
+  )
+
+  # Run the agent
+  async def main():
+      result = await Runner.run(
+          starting_agent=agent,
+          input="What's the latest Hackernews post about?",
+      )
+      print(result.final_output)
+
+  asyncio.run(main())
+  ```
+</Step>
+
+</Steps>
+
+## Virtual Environment (Recommended)
+
+It's recommended to use a virtual environment for your Python projects:
+
+<CodeGroup>
+
+```bash venv
+# Create virtual environment
+python -m venv .venv
+
+# Activate (Linux/macOS)
+source .venv/bin/activate
+
+# Activate (Windows)
+.venv\Scripts\activate
+
+# Install Composio
+pip install composio
+```
+
+```bash poetry
+# Initialize poetry project
+poetry init
+
+# Add Composio
+poetry add composio
+
+# Activate shell
+poetry shell
+```
+
+</CodeGroup>
+
+## Next Steps
+
+- Learn about [authentication](/guides/authentication) for connecting external services
+- Explore [available tools](/tools/overview) and toolkits
+- Build your first [AI agent](/guides/quickstart)
+- Check out [Python examples](https://github.com/ComposioHQ/composio/tree/next/python/examples)

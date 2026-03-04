@@ -1,0 +1,248 @@
+---
+title: OpenAI Provider
+description: Use Composio tools with OpenAI GPT-4 and function calling
+---
+
+The OpenAI provider wraps Composio tools in the format expected by OpenAI's function calling API.
+
+## Installation
+
+```bash
+npm install @composio/openai openai
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAIProvider } from '@composio/openai';
+import OpenAI from 'openai';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new OpenAIProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const openai = new OpenAI({ apiKey: 'your-openai-key' });
+
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  tools,
+  messages: [
+    { role: 'user', content: 'Create a GitHub issue titled "Bug Report"' }
+  ]
+});
+
+// Handle tool calls
+if (response.choices[0].message.tool_calls) {
+  for (const toolCall of response.choices[0].message.tool_calls) {
+    const result = await composio.tools.execute(toolCall.function.name, {
+      userId: 'default',
+      arguments: JSON.parse(toolCall.function.arguments)
+    });
+    console.log('Tool result:', result.data);
+  }
+}
+```
+
+## Usage
+
+### Get Tools
+
+```typescript
+const tools = await composio.tools.get('default', {
+  toolkits: ['github', 'slack'],
+  limit: 10
+});
+// Returns: OpenAI.Chat.Completions.ChatCompletionTool[]
+```
+
+### Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAIProvider } from '@composio/openai';
+import OpenAI from 'openai';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new OpenAIProvider()
+});
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!
+});
+
+async function runAgent(userMessage: string) {
+  const tools = await composio.tools.get('default', {
+    toolkits: ['github']
+  });
+
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: 'user', content: userMessage }
+  ];
+
+  let response = await openai.chat.completions.create({
+    model: 'gpt-4',
+    tools,
+    messages
+  });
+
+  while (response.choices[0].finish_reason === 'tool_calls') {
+    const toolCalls = response.choices[0].message.tool_calls!;
+    
+    // Add assistant message
+    messages.push(response.choices[0].message);
+
+    // Execute tools
+    for (const toolCall of toolCalls) {
+      const result = await composio.tools.execute(toolCall.function.name, {
+        userId: 'default',
+        arguments: JSON.parse(toolCall.function.arguments)
+      });
+
+      // Add tool result
+      messages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(result.data)
+      });
+    }
+
+    // Get next response
+    response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      tools,
+      messages
+    });
+  }
+
+  return response.choices[0].message.content;
+}
+
+const result = await runAgent('Create an issue in my repo');
+console.log(result);
+```
+
+## Tool Format
+
+The OpenAI provider wraps tools in this format:
+
+```typescript
+interface OpenAITool {
+  type: 'function';
+  function: {
+    name: string; // Tool slug
+    description: string; // Tool description
+    parameters: JSONSchema; // Input parameters
+  };
+}
+```
+
+## Streaming
+
+Use OpenAI's streaming API with tools:
+
+```typescript
+const stream = await openai.chat.completions.create({
+  model: 'gpt-4',
+  tools,
+  messages,
+  stream: true
+});
+
+for await (const chunk of stream) {
+  const delta = chunk.choices[0]?.delta;
+  
+  if (delta?.tool_calls) {
+    // Handle streaming tool calls
+    console.log('Tool call:', delta.tool_calls);
+  }
+  
+  if (delta?.content) {
+    process.stdout.write(delta.content);
+  }
+}
+```
+
+## Parallel Tool Calls
+
+OpenAI supports parallel tool execution:
+
+```typescript
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  tools,
+  messages: [
+    { 
+      role: 'user', 
+      content: 'Get my GitHub repos and Slack channels' 
+    }
+  ]
+});
+
+// Execute all tool calls in parallel
+const toolCalls = response.choices[0].message.tool_calls || [];
+const results = await Promise.all(
+  toolCalls.map(toolCall =>
+    composio.tools.execute(toolCall.function.name, {
+      userId: 'default',
+      arguments: JSON.parse(toolCall.function.arguments)
+    })
+  )
+);
+```
+
+## Strict Mode
+
+Use OpenAI's strict mode for structured outputs:
+
+```typescript
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  tools,
+  tool_choice: 'required', // Force tool use
+  messages
+});
+```
+
+## Best Practices
+
+1. **Tool Selection**: Limit tools to only what's needed
+2. **Error Handling**: Wrap tool execution in try-catch
+3. **Rate Limits**: Handle OpenAI rate limits
+4. **Token Usage**: Monitor token consumption
+5. **Timeouts**: Set appropriate timeouts
+
+## TypeScript Types
+
+```typescript
+import type { OpenAI } from 'openai';
+
+// Tool collection type
+type OpenAIToolCollection = OpenAI.Chat.Completions.ChatCompletionTool[];
+
+// Single tool type
+type OpenAITool = OpenAI.Chat.Completions.ChatCompletionTool;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Agents" icon="robot" href="/typescript/providers/openai-agents">
+    Use OpenAI Agents SDK (Swarm)
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up user authentication
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View example code
+  </Card>
+</CardGroup>

@@ -1,0 +1,41 @@
+---
+title: CrewAI Provider
+description: Use Composio tools with CrewAI
+---
+
+## Installation
+
+```bash
+pip install composio-crewai crewai
+```
+
+## Quick Start
+
+```python
+from composio_crewai import CrewAIProvider
+from composio import Composio
+from crewai import Agent, Task, Crew
+
+# Initialize
+composio = Composio(provider=CrewAIProvider())
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Create agent
+agent = Agent(
+    role="GitHub Assistant",
+    goal="Help with GitHub operations",
+    backstory="Expert at managing GitHub repositories",
+    tools=tools
+)
+
+# Create task
+task = Task(
+    description="Star the composiohq/composio repository",
+    agent=agent
+)
+
+# Execute
+crew = Crew(agents=[agent], tasks=[task])
+result = crew.kickoff()
+print(result)
+```

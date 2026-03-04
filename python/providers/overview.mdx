@@ -1,0 +1,71 @@
+---
+title: Provider Integrations
+description: Use Composio with popular AI frameworks
+---
+
+Composio provides dedicated integrations for popular AI frameworks. Each provider package wraps tools in the format expected by that framework.
+
+## Available Providers
+
+### OpenAI
+- Package: `composio-openai`
+- [Documentation](/python/providers/openai)
+
+### Anthropic (Claude)
+- Package: `composio-anthropic`
+- [Documentation](/python/providers/anthropic)
+
+### LangChain
+- Package: `composio-langchain`
+- [Documentation](/python/providers/langchain)
+
+### LangGraph
+- Package: `composio-langgraph`
+- [Documentation](/python/providers/langgraph)
+
+### LlamaIndex
+- Package: `composio-llamaindex`
+- [Documentation](/python/providers/llamaindex)
+
+### CrewAI
+- Package: `composio-crewai`
+- [Documentation](/python/providers/crewai)
+
+### AutoGen
+- Package: `composio-autogen`
+- [Documentation](/python/providers/autogen)
+
+### Google AI
+- Package: `composio-gemini`
+- [Documentation](/python/providers/gemini)
+
+## Installation
+
+```bash
+# OpenAI
+pip install composio-openai
+
+# Anthropic
+pip install composio-anthropic
+
+# LangChain
+pip install composio-langchain
+```
+
+## Usage Pattern
+
+All providers follow a similar pattern:
+
+```python
+from composio import Composio
+from composio_{provider} import {Provider}Provider
+
+# Initialize with provider
+composio = Composio(provider={Provider}Provider())
+
+# Get tools in provider format
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with your AI framework
+# ...
+```

@@ -1,0 +1,590 @@
+---
+title: Custom Tools
+description: Create and execute custom tools with your own logic in Composio
+---
+
+## Overview
+
+Custom tools allow you to extend Composio's functionality with your own implementations while keeping a consistent interface with built-in tools. You can create tools with custom logic, integrate with any API, and optionally leverage connected accounts for authentication.
+
+## Creating a Custom Tool
+
+<Steps>
+
+### Step 1: Define your tool schema
+
+Use Zod to define the input parameters for your tool:
+
+<CodeGroup>
+```typescript TypeScript
+import { Composio } from 'composio-core';
+import { z } from 'zod';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+
+// Define input parameters using Zod
+const searchInputSchema = z.object({
+  query: z.string().describe('The search query'),
+  limit: z.number().optional().describe('Maximum number of results to return'),
+  category: z.enum(['web', 'images', 'news']).optional().describe('Search category')
+});
+```
+
+```python Python
+from composio import Composio
+from pydantic import BaseModel, Field
+
+composio = Composio(api_key=os.environ["COMPOSIO_API_KEY"])
+
+# Define input parameters using Pydantic
+class SearchInput(BaseModel):
+    query: str = Field(description="The search query")
+    limit: int = Field(default=10, description="Maximum number of results")
+    category: str = Field(default="web", description="Search category")
+```
+</CodeGroup>
+
+### Step 2: Implement the execute function
+
+Create the logic for your custom tool:
+
+```typescript
+const customTool = await composio.tools.createCustomTool({
+  name: 'Search Database',
+  slug: 'MY_SEARCH_TOOL',
+  description: 'Search through the internal database',
+  inputParams: searchInputSchema,
+  
+  execute: async (input) => {
+    // Your custom logic here
+    try {
+      const results = await searchDatabase(input.query, input.limit);
+      
+      return {
+        data: {
+          results,
+          count: results.length
+        },
+        error: null,
+        successful: true
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: { message: error.message },
+        successful: false
+      };
+    }
+  }
+});
+```
+
+### Step 3: Execute your custom tool
+
+Once created, execute it like any other tool:
+
+```typescript
+const result = await composio.tools.execute('MY_SEARCH_TOOL', {
+  userId: 'default',
+  arguments: {
+    query: 'composio',
+    limit: 5,
+    category: 'web'
+  }
+});
+
+if (result.successful) {
+  console.log('Search results:', result.data.results);
+}
+```
+
+</Steps>
+
+## Custom Tools with Authentication
+
+Custom tools can leverage connected accounts from existing toolkits for authentication:
+
+```typescript
+import { z } from 'zod';
+
+const customGitHubTool = await composio.tools.createCustomTool({
+  name: 'Get Repository Stats',
+  slug: 'GITHUB_GET_REPO_STATS',
+  description: 'Get detailed statistics for a GitHub repository',
+  toolkitSlug: 'github', // Use GitHub connected accounts
+  inputParams: z.object({
+    owner: z.string().describe('Repository owner'),
+    repo: z.string().describe('Repository name')
+  }),
+  
+  execute: async (input, connectionConfig, executeToolRequest) => {
+    // connectionConfig contains the OAuth tokens from the connected account
+    console.log('Access token:', connectionConfig?.access_token);
+    
+    try {
+      // Option 1: Use executeToolRequest to make authenticated API calls
+      const response = await executeToolRequest({
+        endpoint: `/repos/${input.owner}/${input.repo}`,
+        method: 'GET',
+        parameters: []
+      });
+      
+      // Transform the response
+      const stats = {
+        stars: response.data.stargazers_count,
+        forks: response.data.forks_count,
+        openIssues: response.data.open_issues_count,
+        language: response.data.language
+      };
+      
+      return {
+        data: stats,
+        error: null,
+        successful: true
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: { message: error.message },
+        successful: false
+      };
+    }
+  }
+});
+```
+
+### Execute with Connected Account
+
+```typescript
+// Execute with a specific connected account
+const result = await composio.tools.execute('GITHUB_GET_REPO_STATS', {
+  userId: 'user_123',
+  connectedAccountId: 'conn_abc123', // Optional: specify which account to use
+  arguments: {
+    owner: 'composio',
+    repo: 'composio'
+  }
+});
+
+// Or let Composio automatically use the first connected GitHub account
+const result = await composio.tools.execute('GITHUB_GET_REPO_STATS', {
+  userId: 'user_123',
+  arguments: {
+    owner: 'composio',
+    repo: 'composio'
+  }
+});
+```
+
+## Making Authenticated API Calls
+
+The `executeToolRequest` function allows you to make authenticated requests using the connected account:
+
+```typescript
+execute: async (input, connectionConfig, executeToolRequest) => {
+  // Make a GET request
+  const response = await executeToolRequest({
+    endpoint: '/api/v1/data',
+    method: 'GET',
+    parameters: [
+      { name: 'page', in: 'query', value: '1' },
+      { name: 'X-Custom-Header', in: 'header', value: 'custom-value' }
+    ]
+  });
+  
+  // Make a POST request with body
+  const createResponse = await executeToolRequest({
+    endpoint: '/api/v1/items',
+    method: 'POST',
+    body: {
+      name: input.name,
+      description: input.description
+    },
+    parameters: []
+  });
+  
+  return {
+    data: createResponse.data,
+    error: null,
+    successful: true
+  };
+}
+```
+
+<Warning>
+  The `executeToolRequest` function is only available for custom tools that specify a `toolkitSlug`. It will throw an error for standalone custom tools without a toolkit.
+</Warning>
+
+## Standalone Custom Tools
+
+Create tools without requiring authentication:
+
+```typescript
+const weatherTool = await composio.tools.createCustomTool({
+  name: 'Get Weather',
+  slug: 'GET_WEATHER',
+  description: 'Get current weather for a location',
+  // No toolkitSlug means no authentication required
+  inputParams: z.object({
+    city: z.string().describe('City name'),
+    units: z.enum(['metric', 'imperial']).optional()
+  }),
+  
+  execute: async (input) => {
+    // Make direct API calls with your own credentials
+    const response = await fetch(
+      `https://api.weather.com/v1/weather?city=${input.city}&units=${input.units || 'metric'}`,
+      {
+        headers: {
+          'X-API-Key': process.env.WEATHER_API_KEY
+        }
+      }
+    );
+    
+    const data = await response.json();
+    
+    return {
+      data: {
+        temperature: data.temp,
+        conditions: data.conditions,
+        humidity: data.humidity
+      },
+      error: null,
+      successful: true
+    };
+  }
+});
+```
+
+## Complex Input Parameters
+
+Define complex nested schemas:
+
+```typescript
+const complexTool = await composio.tools.createCustomTool({
+  name: 'Process Order',
+  slug: 'PROCESS_ORDER',
+  description: 'Process a customer order',
+  inputParams: z.object({
+    customer: z.object({
+      id: z.string(),
+      email: z.string().email(),
+      name: z.string()
+    }),
+    items: z.array(z.object({
+      productId: z.string(),
+      quantity: z.number().min(1),
+      price: z.number().positive()
+    })),
+    shipping: z.object({
+      address: z.string(),
+      city: z.string(),
+      zipCode: z.string(),
+      country: z.string()
+    }),
+    paymentMethod: z.enum(['credit_card', 'paypal', 'bank_transfer']),
+    notes: z.string().optional()
+  }),
+  
+  execute: async (input) => {
+    // Process the order
+    const orderId = await processOrder(input);
+    
+    return {
+      data: {
+        orderId,
+        status: 'confirmed',
+        totalAmount: input.items.reduce((sum, item) => 
+          sum + (item.price * item.quantity), 0
+        )
+      },
+      error: null,
+      successful: true
+    };
+  }
+});
+```
+
+## Managing Custom Tools
+
+### Retrieving Custom Tools
+
+```typescript
+// Get a specific custom tool by slug
+const tool = await composio.customTools.getCustomToolBySlug('MY_SEARCH_TOOL');
+
+if (tool) {
+  console.log('Tool name:', tool.name);
+  console.log('Description:', tool.description);
+}
+
+// Get all custom tools
+const allCustomTools = await composio.customTools.getCustomTools({});
+
+// Get specific custom tools by slugs
+const specificTools = await composio.customTools.getCustomTools({
+  toolSlugs: ['MY_SEARCH_TOOL', 'GET_WEATHER']
+});
+```
+
+### Using Custom Tools with AI Providers
+
+Custom tools work seamlessly with AI provider integrations:
+
+```typescript
+import { Composio } from 'composio-core';
+import { OpenAI } from 'openai';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+
+// Create custom tools
+await composio.tools.createCustomTool({
+  name: 'Get User Data',
+  slug: 'GET_USER_DATA',
+  description: 'Retrieve user data from the database',
+  inputParams: z.object({
+    userId: z.string()
+  }),
+  execute: async (input) => {
+    const user = await database.users.findById(input.userId);
+    return { data: user, error: null, successful: true };
+  }
+});
+
+// Get tools including custom tools
+const tools = await composio.tools.get('user_123', {
+  tools: ['GET_USER_DATA', 'GITHUB_GET_REPOS']
+});
+
+// Use with OpenAI
+const openai = new OpenAI();
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: 'Get data for user 12345' }],
+  tools: tools
+});
+```
+
+## Error Handling in Custom Tools
+
+Implement robust error handling:
+
+```typescript
+const robustTool = await composio.tools.createCustomTool({
+  name: 'Fetch External API',
+  slug: 'FETCH_EXTERNAL_API',
+  description: 'Fetch data from an external API',
+  inputParams: z.object({
+    endpoint: z.string().url()
+  }),
+  
+  execute: async (input) => {
+    try {
+      // Validate input
+      if (!input.endpoint.startsWith('https://')) {
+        return {
+          data: null,
+          error: { 
+            message: 'Only HTTPS endpoints are allowed',
+            code: 'INVALID_ENDPOINT'
+          },
+          successful: false
+        };
+      }
+      
+      // Make API call with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(input.endpoint, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      
+      if (!response.ok) {
+        return {
+          data: null,
+          error: {
+            message: `HTTP error: ${response.status} ${response.statusText}`,
+            code: 'HTTP_ERROR',
+            statusCode: response.status
+          },
+          successful: false
+        };
+      }
+      
+      const data = await response.json();
+      
+      return {
+        data,
+        error: null,
+        successful: true
+      };
+      
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        return {
+          data: null,
+          error: {
+            message: 'Request timeout after 5 seconds',
+            code: 'TIMEOUT'
+          },
+          successful: false
+        };
+      }
+      
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Unknown error occurred',
+          code: 'EXECUTION_ERROR'
+        },
+        successful: false
+      };
+    }
+  }
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive Slugs" icon="tag">
+    Choose clear, uppercase slugs with underscores (e.g., `MY_CUSTOM_TOOL`) for consistency.
+  </Card>
+  
+  <Card title="Document Parameters" icon="book">
+    Use Zod's `.describe()` method to add clear descriptions to all input parameters.
+  </Card>
+  
+  <Card title="Handle Errors Gracefully" icon="shield">
+    Always return structured error objects with meaningful messages and error codes.
+  </Card>
+  
+  <Card title="Leverage Connected Accounts" icon="plug">
+    Use `toolkitSlug` and `executeToolRequest` for authenticated API calls when possible.
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+### Database Integration
+
+```typescript
+const dbTool = await composio.tools.createCustomTool({
+  name: 'Query Database',
+  slug: 'QUERY_DATABASE',
+  description: 'Execute a database query',
+  inputParams: z.object({
+    table: z.string(),
+    filters: z.record(z.unknown()).optional()
+  }),
+  execute: async (input) => {
+    const results = await db(input.table)
+      .where(input.filters || {})
+      .select();
+    
+    return {
+      data: { results, count: results.length },
+      error: null,
+      successful: true
+    };
+  }
+});
+```
+
+### Webhook Integration
+
+```typescript
+const webhookTool = await composio.tools.createCustomTool({
+  name: 'Send Webhook',
+  slug: 'SEND_WEBHOOK',
+  description: 'Send data to a webhook URL',
+  inputParams: z.object({
+    url: z.string().url(),
+    payload: z.record(z.unknown())
+  }),
+  execute: async (input) => {
+    const response = await fetch(input.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input.payload)
+    });
+    
+    return {
+      data: { 
+        statusCode: response.status,
+        success: response.ok 
+      },
+      error: null,
+      successful: response.ok
+    };
+  }
+});
+```
+
+### File Processing
+
+```typescript
+const fileProcessorTool = await composio.tools.createCustomTool({
+  name: 'Process CSV File',
+  slug: 'PROCESS_CSV',
+  description: 'Parse and process CSV data',
+  inputParams: z.object({
+    fileUrl: z.string().url(),
+    delimiter: z.string().default(',')
+  }),
+  execute: async (input) => {
+    const response = await fetch(input.fileUrl);
+    const csvText = await response.text();
+    
+    const rows = csvText.split('\n').map(row => 
+      row.split(input.delimiter)
+    );
+    
+    return {
+      data: {
+        headers: rows[0],
+        rowCount: rows.length - 1,
+        preview: rows.slice(0, 5)
+      },
+      error: null,
+      successful: true
+    };
+  }
+});
+```
+
+## Limitations
+
+<Warning>
+  - Custom tools are stored in-memory and not persisted across SDK instances
+  - The `executeToolRequest` function only works with custom tools that have a `toolkitSlug`
+  - Custom tools cannot use Composio's automatic file upload/download features
+  - Tool schemas are validated at creation time, not at runtime
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool Execution" icon="play" href="/guides/tool-execution">
+    Learn how to execute custom and built-in tools
+  </Card>
+  
+  <Card title="Modifiers" icon="sliders" href="/guides/modifiers">
+    Apply modifiers to customize tool behavior
+  </Card>
+  
+  <Card title="Authentication Flows" icon="key" href="/guides/authentication-flows">
+    Set up connected accounts for authenticated custom tools
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Handle errors in custom tool execution
+  </Card>
+</CardGroup>

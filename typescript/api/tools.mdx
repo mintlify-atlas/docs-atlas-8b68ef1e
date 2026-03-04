@@ -1,0 +1,409 @@
+---
+title: Tools API
+description: List, retrieve, and execute tools from the Composio SDK
+---
+
+The `tools` API provides methods to discover and execute tools across 250+ integrations. Tools are individual actions like `GITHUB_CREATE_ISSUE` or `GMAIL_SEND_EMAIL`.
+
+## Methods
+
+### get()
+
+Fetch tools wrapped in your provider's format.
+
+```typescript
+// Get tools by filters
+async get<T extends TProvider>(
+  userId: string,
+  filters: ToolListParams,
+  options?: ProviderOptions<TProvider>
+): Promise<ReturnType<T['wrapTools']>>
+
+// Get a single tool by slug
+async get<T extends TProvider>(
+  userId: string,
+  slug: string,
+  options?: ProviderOptions<TProvider>
+): Promise<ReturnType<T['wrapTools']>>
+```
+
+<ParamField path="userId" type="string" required>
+  User ID for authentication and tracking
+</ParamField>
+
+<ParamField path="filters" type="ToolListParams">
+  <Expandable title="properties">
+    <ParamField path="toolkits" type="string[]">
+      Filter by toolkit slugs (e.g., `['github', 'slack']`)
+    </ParamField>
+    <ParamField path="tools" type="string[]">
+      Specific tool slugs to fetch
+    </ParamField>
+    <ParamField path="tags" type="string[]">
+      Filter by tags (e.g., `['important']`)
+    </ParamField>
+    <ParamField path="search" type="string">
+      Search tools by name or description
+    </ParamField>
+    <ParamField path="authConfigIds" type="string[]">
+      Filter by auth config IDs
+    </ParamField>
+    <ParamField path="limit" type="number">
+      Maximum number of tools to return
+    </ParamField>
+    <ParamField path="important" type="boolean">
+      Auto-set to true when fetching by toolkit. Set to false to get all tools.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="options" type="ProviderOptions" optional>
+  <Expandable title="properties">
+    <ParamField path="modifySchema" type="TransformToolSchemaModifier">
+      Transform tool schemas before wrapping
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Get tools from toolkit">
+    ```typescript
+    import { Composio } from '@composio/core';
+    import { OpenAIProvider } from '@composio/openai';
+
+    const composio = new Composio({
+      apiKey: 'your-key',
+      provider: new OpenAIProvider()
+    });
+
+    const tools = await composio.tools.get('default', {
+      toolkits: ['github'],
+      limit: 10
+    });
+
+    // Use with OpenAI
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      tools,
+      messages: [{ role: 'user', content: 'Create an issue' }]
+    });
+    ```
+  </Tab>
+  <Tab title="Get specific tool">
+    ```typescript
+    const tool = await composio.tools.get('default', 'GITHUB_CREATE_ISSUE');
+    ```
+  </Tab>
+  <Tab title="Search tools">
+    ```typescript
+    const tools = await composio.tools.get('default', {
+      search: 'send email',
+      limit: 5
+    });
+    ```
+  </Tab>
+  <Tab title="With schema transformation">
+    ```typescript
+    const tools = await composio.tools.get('default', {
+      toolkits: ['github']
+    }, {
+      modifySchema: ({ toolSlug, toolkitSlug, schema }) => ({
+        ...schema,
+        description: `[${toolkitSlug}] ${schema.description}`
+      })
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### execute()
+
+Execute a tool directly.
+
+```typescript
+async execute(
+  slug: string,
+  body: ToolExecuteParams,
+  modifiers?: ExecuteToolModifiers
+): Promise<ToolExecuteResponse>
+```
+
+<ParamField path="slug" type="string" required>
+  Tool slug to execute (e.g., `GITHUB_CREATE_ISSUE`)
+</ParamField>
+
+<ParamField path="body" type="ToolExecuteParams" required>
+  <Expandable title="properties">
+    <ParamField path="userId" type="string">
+      User ID for authentication
+    </ParamField>
+    <ParamField path="connectedAccountId" type="string">
+      Specific connected account to use
+    </ParamField>
+    <ParamField path="arguments" type="Record<string, unknown>" required>
+      Tool input parameters
+    </ParamField>
+    <ParamField path="version" type="string">
+      Specific toolkit version (e.g., `20250909_00`)
+    </ParamField>
+    <ParamField path="dangerouslySkipVersionCheck" type="boolean">
+      Skip version validation for "latest". Not recommended for production.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="modifiers" type="ExecuteToolModifiers" optional>
+  <Expandable title="properties">
+    <ParamField path="beforeExecute" type="function">
+      Transform parameters before execution
+    </ParamField>
+    <ParamField path="afterExecute" type="function">
+      Transform results after execution
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Basic execution">
+    ```typescript
+    const result = await composio.tools.execute('GITHUB_CREATE_ISSUE', {
+      userId: 'default',
+      arguments: {
+        owner: 'composio',
+        repo: 'sdk',
+        title: 'Bug report',
+        body: 'Description of the bug'
+      }
+    });
+
+    console.log(result.data); // Created issue
+    console.log(result.successful); // true
+    ```
+  </Tab>
+  <Tab title="With version">
+    ```typescript
+    const result = await composio.tools.execute('GITHUB_CREATE_ISSUE', {
+      userId: 'default',
+      version: '20250909_00',
+      arguments: { owner: 'composio', repo: 'sdk', title: 'Issue' }
+    });
+    ```
+  </Tab>
+  <Tab title="With modifiers">
+    ```typescript
+    const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'default',
+      arguments: { owner: 'composio' }
+    }, {
+      beforeExecute: ({ params }) => {
+        console.log('Executing with:', params.arguments);
+        return params;
+      },
+      afterExecute: ({ result }) => {
+        console.log('Got:', result.data);
+        return result;
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### getRawComposioTools()
+
+Fetch tools in raw Composio format without provider wrapping.
+
+```typescript
+async getRawComposioTools(
+  query: ToolListParams,
+  options?: SchemaModifierOptions
+): Promise<ToolList>
+```
+
+**Example:**
+
+```typescript
+const tools = await composio.tools.getRawComposioTools({
+  toolkits: ['github'],
+  limit: 5
+});
+
+console.log(tools[0].slug); // GITHUB_CREATE_ISSUE
+console.log(tools[0].inputParameters); // JSON Schema
+```
+
+### getRawComposioToolBySlug()
+
+Fetch a single tool in raw format.
+
+```typescript
+async getRawComposioToolBySlug(
+  slug: string,
+  options?: ToolRetrievalOptions
+): Promise<Tool>
+```
+
+**Example:**
+
+```typescript
+const tool = await composio.tools.getRawComposioToolBySlug('GITHUB_CREATE_ISSUE');
+
+console.log(tool.name); // "Create Issue"
+console.log(tool.version); // "20250909_00"
+console.log(tool.inputParameters); // JSON Schema
+```
+
+### createCustomTool()
+
+Create a custom tool with your own logic.
+
+```typescript
+async createCustomTool<T extends CustomToolInputParameter>(
+  body: CustomToolOptions<T>
+): Promise<Tool>
+```
+
+<ParamField path="body" type="CustomToolOptions" required>
+  <Expandable title="properties">
+    <ParamField path="name" type="string" required>
+      Human-readable tool name
+    </ParamField>
+    <ParamField path="slug" type="string" required>
+      Unique tool identifier (uppercase snake_case)
+    </ParamField>
+    <ParamField path="description" type="string" required>
+      What the tool does
+    </ParamField>
+    <ParamField path="inputParams" type="ZodSchema" required>
+      Zod schema for input validation
+    </ParamField>
+    <ParamField path="execute" type="function" required>
+      Async function that executes the tool
+    </ParamField>
+    <ParamField path="toolkitSlug" type="string" optional>
+      Associate with a toolkit for auth
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Simple custom tool">
+    ```typescript
+    import { z } from 'zod';
+
+    const tool = await composio.tools.createCustomTool({
+      name: 'Weather Search',
+      slug: 'WEATHER_SEARCH',
+      description: 'Get current weather for a location',
+      inputParams: z.object({
+        location: z.string().describe('City name')
+      }),
+      execute: async (input) => {
+        const weather = await fetch(`https://api.weather.com/${input.location}`);
+        return {
+          data: await weather.json(),
+          error: null,
+          successful: true
+        };
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="With toolkit integration">
+    ```typescript
+    const tool = await composio.tools.createCustomTool({
+      name: 'GitHub Advanced Search',
+      slug: 'GITHUB_ADVANCED_SEARCH',
+      description: 'Custom GitHub search with filters',
+      toolkitSlug: 'github', // Use GitHub auth
+      userId: 'default',
+      connectedAccountId: 'conn_123',
+      inputParams: z.object({
+        query: z.string(),
+        language: z.string().optional()
+      }),
+      execute: async (input, connectionConfig, executeToolRequest) => {
+        // Use executeToolRequest to make authenticated calls
+        const result = await executeToolRequest({
+          endpoint: '/search/repositories',
+          method: 'GET',
+          parameters: [
+            { name: 'q', in: 'query', value: input.query },
+            { name: 'language', in: 'query', value: input.language || '' }
+          ]
+        });
+        return result;
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### getToolsEnum()
+
+Get a list of all available tool slugs.
+
+```typescript
+async getToolsEnum(): Promise<ToolRetrieveEnumResponse>
+```
+
+**Example:**
+
+```typescript
+const allTools = await composio.tools.getToolsEnum();
+console.log(allTools.items); // ['GITHUB_CREATE_ISSUE', 'SLACK_SEND_MESSAGE', ...]
+```
+
+## Types
+
+### ToolExecuteResponse
+
+Result from tool execution.
+
+```typescript
+interface ToolExecuteResponse {
+  data: Record<string, unknown>; // Tool output
+  error: string | null; // Error message if failed
+  successful: boolean; // Whether execution succeeded
+  logId?: string; // Log ID for debugging
+  sessionInfo?: Record<string, unknown>; // Session metadata
+}
+```
+
+### Tool
+
+Raw tool schema.
+
+```typescript
+interface Tool {
+  slug: string; // Tool identifier
+  name: string; // Human-readable name
+  description: string; // What the tool does
+  inputParameters: JSONSchema; // Input schema
+  outputParameters: JSONSchema; // Output schema
+  toolkit?: { // Associated toolkit
+    name: string;
+    slug: string;
+  };
+  version?: string; // Toolkit version
+  availableVersions?: string[]; // All available versions
+  isDeprecated?: boolean; // Deprecated status
+  isNoAuth?: boolean; // Requires no authentication
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Toolkits API" icon="box" href="/typescript/api/toolkits">
+    Discover available toolkits
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Manage user authentication
+  </Card>
+  <Card title="Custom Tools" icon="code" href="/typescript/api/custom-tools">
+    Create custom tools
+  </Card>
+  <Card title="Providers" icon="plug" href="/typescript/providers/overview">
+    Choose your AI framework
+  </Card>
+</CardGroup>

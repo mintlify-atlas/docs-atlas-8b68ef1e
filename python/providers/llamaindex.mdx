@@ -1,0 +1,23 @@
+---
+title: LlamaIndex Provider
+description: Use Composio tools with LlamaIndex
+---
+
+## Installation
+
+```bash
+pip install composio-llamaindex llama-index
+```
+
+## Usage
+
+```python
+from composio_llamaindex import LlamaIndexProvider
+from composio import Composio
+
+composio = Composio(provider=LlamaIndexProvider())
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with LlamaIndex
+# ...
+```

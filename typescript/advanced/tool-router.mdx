@@ -1,0 +1,366 @@
+---
+title: Tool Router
+description: Intelligent tool routing and connection management
+---
+
+<Note>
+  Tool Router is an experimental feature that provides intelligent tool routing, automatic connection management, and MCP server integration.
+</Note>
+
+Tool Router creates isolated sessions for users with automatic connection management, toolkit access control, and MCP server support.
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-key' });
+
+const session = await composio.toolRouter.create('user_123', {
+  toolkits: ['github', 'slack'],
+  manageConnections: true
+});
+
+console.log('Session ID:', session.sessionId);
+console.log('MCP URL:', session.mcp.url);
+
+const tools = await session.tools();
+```
+
+## Creating Sessions
+
+### create()
+
+Create a new Tool Router session for a user:
+
+```typescript
+async create(
+  userId: string,
+  config?: ToolRouterCreateSessionConfig
+): Promise<ToolRouterSession>
+```
+
+<ParamField path="userId" type="string" required>
+  External user ID from your database
+</ParamField>
+
+<ParamField path="config" type="ToolRouterCreateSessionConfig" optional>
+  <Expandable title="properties">
+    <ParamField path="toolkits" type="string[] | ToolkitConfig[]">
+      Toolkits to enable for this session
+    </ParamField>
+    <ParamField path="manageConnections" type="boolean" default={false}>
+      Enable automatic connection management UI
+    </ParamField>
+    <ParamField path="tools" type="ToolsConfig">
+      Enable/disable specific tools per toolkit
+    </ParamField>
+    <ParamField path="tags" type="string[]">
+      Filter tools by tags
+    </ParamField>
+    <ParamField path="authConfigs" type="string[]">
+      Specific auth configs to use
+    </ParamField>
+    <ParamField path="connectedAccounts" type="string[]">
+      Pre-connected accounts
+    </ParamField>
+    <ParamField path="workbench" type="WorkbenchConfig">
+      Enable workbench mode for testing
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Basic Session">
+    ```typescript
+    const session = await composio.toolRouter.create('user_123', {
+      toolkits: ['github', 'slack']
+    });
+    ```
+  </Tab>
+  <Tab title="With Connection Management">
+    ```typescript
+    const session = await composio.toolRouter.create('user_123', {
+      toolkits: ['github'],
+      manageConnections: true // Enables connection UI
+    });
+
+    // User can connect accounts via MCP UI
+    console.log(`Connect at: ${session.mcp.url}`);
+    ```
+  </Tab>
+  <Tab title="With Tool Restrictions">
+    ```typescript
+    const session = await composio.toolRouter.create('user_123', {
+      toolkits: ['github'],
+      tools: {
+        github: {
+          disabled: ['GITHUB_DELETE_REPO'] // Disable dangerous tools
+        }
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="With Tags">
+    ```typescript
+    const session = await composio.toolRouter.create('user_123', {
+      toolkits: ['github'],
+      tags: ['important'] // Only include important tools
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Session Object
+
+The session object provides access to tools, connections, and MCP:
+
+```typescript
+interface ToolRouterSession {
+  sessionId: string; // Unique session identifier
+  mcp: { // MCP server config
+    type: 'streamable_http';
+    url: string;
+    headers: Record<string, string>;
+  };
+  tools: () => Promise<WrappedTools>; // Get tools for your provider
+  authorize: (toolkit: string) => Promise<ConnectionRequest>; // Authorize toolkit
+  toolkits: () => Promise<ToolkitConnectionState[]>; // List toolkits
+}
+```
+
+## Using Sessions
+
+### get tools()
+
+Get tools wrapped for your provider:
+
+```typescript
+const session = await composio.toolRouter.create('user_123', {
+  toolkits: ['github']
+});
+
+const tools = await session.tools();
+// Returns tools in your provider's format (OpenAI, Anthropic, etc.)
+```
+
+### authorize()
+
+Initiate toolkit authorization:
+
+```typescript
+const connectionRequest = await session.authorize('github', {
+  callbackUrl: 'https://your-app.com/callback'
+});
+
+if (connectionRequest.redirectUrl) {
+  console.log(`User should visit: ${connectionRequest.redirectUrl}`);
+  
+  const connection = await connectionRequest.waitForConnection();
+  console.log('Connected!', connection.id);
+}
+```
+
+### toolkits()
+
+List toolkit connection states:
+
+```typescript
+const toolkits = await session.toolkits();
+
+toolkits.items.forEach(toolkit => {
+  console.log(toolkit.slug, toolkit.name);
+  
+  if (toolkit.connection) {
+    console.log('Connected:', toolkit.connection.isActive);
+  } else if (!toolkit.isNoAuth) {
+    console.log('Not connected');
+  }
+});
+```
+
+## Using Existing Sessions
+
+### use()
+
+Retrieve an existing session:
+
+```typescript
+const session = await composio.toolRouter.use('session_abc123');
+
+const tools = await session.tools();
+const toolkits = await session.toolkits();
+```
+
+## MCP Server Integration
+
+Each session provides an MCP server URL:
+
+```typescript
+const session = await composio.toolRouter.create('user_123', {
+  toolkits: ['github'],
+  manageConnections: true
+});
+
+console.log('MCP URL:', session.mcp.url);
+console.log('Headers:', session.mcp.headers);
+
+// Use with Claude Desktop, Cursor, or other MCP clients
+```
+
+### MCP Client Configuration
+
+For Claude Desktop or Cursor:
+
+```json
+{
+  "mcpServers": {
+    "composio-session": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch",
+        "${session.mcp.url}"
+      ],
+      "env": {
+        "x-api-key": "your-composio-api-key"
+      }
+    }
+  }
+}
+```
+
+## Tool Access Control
+
+Control which tools are available:
+
+```typescript
+const session = await composio.toolRouter.create('user_123', {
+  toolkits: ['github'],
+  tools: {
+    github: {
+      // Only enable specific tools
+      enabled: [
+        'GITHUB_GET_REPOS',
+        'GITHUB_CREATE_ISSUE',
+        'GITHUB_LIST_ISSUES'
+      ]
+    }
+  }
+});
+
+// Or disable specific tools
+const session = await composio.toolRouter.create('user_123', {
+  toolkits: ['github'],
+  tools: {
+    github: {
+      disabled: [
+        'GITHUB_DELETE_REPO',
+        'GITHUB_DELETE_FILE'
+      ]
+    }
+  }
+});
+```
+
+## Workbench Mode
+
+Enable workbench mode for testing:
+
+```typescript
+const session = await composio.toolRouter.create('user_123', {
+  toolkits: ['github'],
+  workbench: {
+    enabled: true
+  }
+});
+
+// Provides a web UI for testing tools
+console.log(`Test tools at: ${session.mcp.url}/workbench`);
+```
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAIProvider } from '@composio/openai';
+import OpenAI from 'openai';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new OpenAIProvider()
+});
+
+const openai = new OpenAI();
+
+async function runAgentWithSession(userId: string, userMessage: string) {
+  // Create session
+  const session = await composio.toolRouter.create(userId, {
+    toolkits: ['github', 'slack'],
+    manageConnections: true,
+    tools: {
+      github: {
+        disabled: ['GITHUB_DELETE_REPO']
+      }
+    }
+  });
+
+  // Get tools
+  const tools = await session.tools();
+
+  // Check connections
+  const toolkits = await session.toolkits();
+  const githubToolkit = toolkits.items.find(t => t.slug === 'github');
+  
+  if (!githubToolkit?.connection?.isActive) {
+    const connection = await session.authorize('github');
+    console.log(`Connect GitHub at: ${connection.redirectUrl}`);
+    await connection.waitForConnection();
+  }
+
+  // Run agent
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4',
+    tools,
+    messages: [{ role: 'user', content: userMessage }]
+  });
+
+  return response.choices[0].message.content;
+}
+
+const result = await runAgentWithSession(
+  'user_123',
+  'Create a GitHub issue and notify team in Slack'
+);
+```
+
+## Best Practices
+
+1. **Session Reuse**: Store session IDs and reuse them
+2. **Connection Management**: Enable `manageConnections` for user-driven auth
+3. **Tool Restrictions**: Disable dangerous tools in production
+4. **Error Handling**: Handle connection failures gracefully
+5. **Session Cleanup**: Delete sessions when no longer needed
+
+## Limitations
+
+- Sessions are experimental and API may change
+- MCP integration requires MCP-compatible clients
+- Some features may not work in all environments
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MCP" icon="server" href="/typescript/advanced/mcp">
+    Learn about MCP servers
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Manage connections
+  </Card>
+  <Card title="Composio Class" icon="code" href="/typescript/api/composio">
+    Main SDK reference
+  </Card>
+</CardGroup>

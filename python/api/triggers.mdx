@@ -1,0 +1,60 @@
+---
+title: Triggers
+description: Create event-driven workflows with webhooks and real-time subscriptions
+---
+
+Triggers allow you to respond to events from third-party services in real-time.
+
+## Methods
+
+### create
+
+```python
+trigger = composio.triggers.create(
+    slug="GITHUB_COMMIT_EVENT",
+    user_id="user_123",
+    trigger_config={"owner": "composiohq", "repo": "composio"}
+)
+```
+
+### subscribe
+
+```python
+subscription = composio.triggers.subscribe()
+
+@subscription.handle(trigger_slug="GITHUB_COMMIT_EVENT")
+def on_commit(event):
+    print(f"New commit: {event['payload']}")
+
+subscription.wait_forever()
+```
+
+### verify_webhook
+
+```python
+result = composio.triggers.verify_webhook(
+    id=request.headers.get('webhook-id'),
+    payload=request.body,
+    signature=request.headers.get('webhook-signature'),
+    timestamp=request.headers.get('webhook-timestamp'),
+    secret=os.environ['COMPOSIO_WEBHOOK_SECRET']
+)
+
+print(f"Version: {result['version']}")
+print(f"Trigger: {result['payload']['trigger_slug']}")
+```
+
+### list / list_active
+
+```python
+triggers = composio.triggers.list(toolkit_slugs=["github"])
+active = composio.triggers.list_active(user_id="user_123")
+```
+
+### enable / disable / delete
+
+```python
+composio.triggers.enable("ti_xxx")
+composio.triggers.disable("ti_xxx")
+composio.triggers.delete("ti_xxx")
+```

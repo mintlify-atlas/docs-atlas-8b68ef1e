@@ -1,0 +1,283 @@
+---
+title: Platform Support
+description: Runtime compatibility and platform-specific considerations
+---
+
+Composio TypeScript SDK supports multiple JavaScript runtimes with varying levels of compatibility.
+
+## Supported Platforms
+
+### Node.js ✅
+
+**Fully Supported** - All features work out of the box.
+
+```bash
+node >= 18.0.0
+```
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-key' });
+```
+
+**Features:**
+- ✅ All API methods
+- ✅ File operations
+- ✅ Triggers (Pusher)
+- ✅ MCP servers
+- ✅ Tool Router
+- ✅ Custom tools
+
+### Bun ✅
+
+**Fully Supported** - Optimized for Bun runtime.
+
+```bash
+bun >= 1.0.0
+```
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-key' });
+```
+
+**Features:**
+- ✅ All API methods
+- ✅ File operations (Bun.file)
+- ✅ Triggers
+- ✅ Faster performance than Node.js
+
+### Deno ⚠️
+
+**Partially Supported** - Requires permissions.
+
+```typescript
+// Import from npm:
+import { Composio } from 'npm:@composio/core';
+
+const composio = new Composio({ apiKey: 'your-key' });
+```
+
+**Required Permissions:**
+```bash
+deno run --allow-net --allow-read --allow-write --allow-env your-script.ts
+```
+
+**Features:**
+- ✅ All API methods
+- ⚠️ File operations (with --allow-read/--allow-write)
+- ✅ Triggers
+- ⚠️ May require additional permissions
+
+### Cloudflare Workers ⚠️
+
+**Partially Supported** - No filesystem access.
+
+```typescript
+import { Composio } from '@composio/core';
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const composio = new Composio({ apiKey: env.COMPOSIO_API_KEY });
+    
+    const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'default',
+      arguments: { owner: 'composio' }
+    });
+    
+    // Important: Flush telemetry before worker terminates
+    ctx.waitUntil(composio.flush());
+    
+    return new Response(JSON.stringify(result));
+  }
+};
+```
+
+**Features:**
+- ✅ Tool execution
+- ✅ Connected accounts
+- ✅ Auth configs
+- ❌ File operations (no fs)
+- ⚠️ Triggers (requires Durable Objects)
+- ⚠️ Must call `flush()` before termination
+
+**Limitations:**
+- No filesystem access
+- No persistent storage
+- Must manually flush telemetry
+- Limited to 50ms CPU time
+
+### Browser ⚠️
+
+**Limited Support** - Use for client-side auth flows only.
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-public-key' });
+
+// ⚠️ Don't expose your API key in browser!
+// Use backend proxy for sensitive operations
+
+const connectionRequest = await composio.connectedAccounts.link(
+  'user_123',
+  'auth_config_abc'
+);
+
+window.location.href = connectionRequest.redirectUrl;
+```
+
+**Features:**
+- ⚠️ Limited to public APIs
+- ✅ Connection flows
+- ❌ Tool execution (use backend)
+- ❌ File operations
+- ❌ Triggers
+
+**Security Warning:**
+<Warning>
+  Never expose your Composio API key in browser code. Use a backend proxy for sensitive operations.
+</Warning>
+
+## Feature Compatibility Matrix
+
+| Feature | Node.js | Bun | Deno | Cloudflare | Browser |
+|---------|---------|-----|------|------------|----------|
+| Tools API | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Toolkits | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Connected Accounts | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Auth Configs | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Triggers | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| File Operations | ✅ | ✅ | ⚠️ | ❌ | ❌ |
+| Custom Tools | ✅ | ✅ | ✅ | ✅ | ❌ |
+| MCP Servers | ✅ | ✅ | ⚠️ | ❌ | ❌ |
+| Tool Router | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+
+## Platform-Specific Code
+
+### Cloudflare Workers
+
+```typescript
+import { Composio } from '@composio/core';
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const composio = new Composio({
+      apiKey: env.COMPOSIO_API_KEY,
+      // Disable file operations
+      autoUploadDownloadFiles: false
+    });
+
+    try {
+      const tools = await composio.tools.get('default', {
+        toolkits: ['github']
+      });
+
+      return new Response(JSON.stringify(tools));
+    } finally {
+      // Always flush telemetry
+      ctx.waitUntil(composio.flush());
+    }
+  }
+};
+```
+
+### Deno
+
+```typescript
+// deno.json
+{
+  "imports": {
+    "@composio/core": "npm:@composio/core"
+  },
+  "tasks": {
+    "dev": "deno run --allow-all main.ts"
+  }
+}
+```
+
+```typescript
+// main.ts
+import { Composio } from '@composio/core';
+
+const composio = new Composio({
+  apiKey: Deno.env.get('COMPOSIO_API_KEY')!
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+console.log(tools);
+```
+
+## Testing
+
+Run platform-specific tests:
+
+```bash
+# Node.js
+pnpm test
+
+# Node.js CJS/ESM compatibility
+pnpm test:e2e:node
+
+# Deno
+pnpm test:e2e:deno
+
+# Cloudflare Workers
+pnpm test:e2e:cloudflare
+```
+
+## Best Practices
+
+1. **Platform Detection**: Check runtime before using platform-specific features
+2. **Graceful Degradation**: Disable unsupported features
+3. **Error Handling**: Handle platform-specific errors
+4. **Testing**: Test on target platform
+5. **Documentation**: Document platform requirements
+
+## Troubleshooting
+
+### "fs module not found" in Cloudflare Workers
+
+```typescript
+// Disable file operations
+const composio = new Composio({
+  apiKey: 'your-key',
+  autoUploadDownloadFiles: false
+});
+```
+
+### "Telemetry not flushing" in Workers
+
+```typescript
+// Always call flush()
+ctx.waitUntil(composio.flush());
+```
+
+### Permission errors in Deno
+
+```bash
+# Grant required permissions
+deno run --allow-net --allow-env --allow-read --allow-write your-script.ts
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/typescript/installation">
+    Get started
+  </Card>
+  <Card title="Files API" icon="file" href="/typescript/advanced/files">
+    File operations
+  </Card>
+  <Card title="Composio Class" icon="code" href="/typescript/api/composio">
+    Main SDK reference
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View examples
+  </Card>
+</CardGroup>

@@ -1,0 +1,617 @@
+---
+title: Error Handling
+description: Implement robust error handling strategies in Composio SDK
+---
+
+## Overview
+
+Proper error handling is crucial for building reliable applications with Composio. This guide covers the different types of errors, how to handle them, and best practices for error recovery.
+
+## Error Types
+
+Composio SDK has two main categories of errors:
+
+1. **SDK-Level Errors**: Thrown as exceptions that you catch with try-catch
+2. **Tool-Level Errors**: Returned in the execution response's `error` field
+
+## SDK-Level Errors
+
+These errors are thrown when there's an issue with SDK operations (validation, API communication, etc.).
+
+### Base Error Class
+
+All Composio errors extend the `ComposioError` class:
+
+```typescript
+import { ComposioError } from 'composio-core';
+
+try {
+  // SDK operation
+} catch (error) {
+  if (error instanceof ComposioError) {
+    console.error('Error code:', error.code);
+    console.error('Message:', error.message);
+    console.error('Possible fixes:', error.possibleFixes);
+  }
+}
+```
+
+### Error Properties
+
+ComposioError provides helpful properties:
+
+- `name`: Error type name (e.g., 'ComposioToolNotFoundError')
+- `message`: Human-readable error message
+- `code`: Error code for categorization (e.g., 'TS-SDK::TOOL_NOT_FOUND')
+- `statusCode`: HTTP status code (when applicable)
+- `cause`: The underlying error that caused this error
+- `possibleFixes`: Array of suggested solutions
+- `meta`: Additional metadata about the error
+
+### Common SDK Errors
+
+#### Tool Not Found Error
+
+```typescript
+import { ComposioToolNotFoundError } from 'composio-core';
+
+try {
+  const tool = await composio.tools.getRawComposioToolBySlug('INVALID_TOOL');
+} catch (error) {
+  if (error instanceof ComposioToolNotFoundError) {
+    console.error('Tool not found:', error.message);
+    console.log('Suggestions:', error.possibleFixes);
+    // ['Ensure the tool slug is correct and exists in the Composio project']
+  }
+}
+```
+
+#### Connected Account Not Found Error
+
+```typescript
+import { ComposioConnectedAccountNotFoundError } from 'composio-core';
+
+try {
+  const account = await composio.connectedAccounts.get('invalid_id');
+} catch (error) {
+  if (error instanceof ComposioConnectedAccountNotFoundError) {
+    console.error('Account not found:', error.message);
+    console.error('Status code:', error.statusCode); // 404
+    // Prompt user to connect their account
+  }
+}
+```
+
+#### Validation Error
+
+```typescript
+import { ValidationError } from 'composio-core';
+
+try {
+  const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+    userId: 'user_123',
+    version: '20250909_00',
+    arguments: {
+      owner: 123 // Invalid: should be string
+    }
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Validation failed:', error.message);
+    console.error('Issues:', error.possibleFixes);
+    // Shows detailed validation errors from Zod
+  }
+}
+```
+
+#### Tool Version Required Error
+
+```typescript
+import { ComposioToolVersionRequiredError } from 'composio-core';
+
+try {
+  // Toolkit version resolves to 'latest'
+  const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+    userId: 'user_123',
+    // No version specified and toolkitVersions is 'latest'
+    arguments: { owner: 'composio' }
+  });
+} catch (error) {
+  if (error instanceof ComposioToolVersionRequiredError) {
+    console.error('Version required:', error.message);
+    console.log('Fixes:', error.possibleFixes);
+    /*
+    [
+      'Pass the toolkit version as a parameter to the execute function',
+      'Set the toolkit versions in the Composio config',
+      'Set the toolkit version in the environment variable',
+      'Set dangerouslySkipVersionCheck to true'
+    ]
+    */
+  }
+}
+```
+
+#### Multiple Connected Accounts Error
+
+```typescript
+import { ComposioMultipleConnectedAccountsError } from 'composio-core';
+
+try {
+  const connectionRequest = await composio.connectedAccounts.initiate(
+    'user_123',
+    authConfigId
+    // Missing allowMultiple: true
+  );
+} catch (error) {
+  if (error instanceof ComposioMultipleConnectedAccountsError) {
+    console.error('Multiple accounts exist:', error.message);
+    console.log('Fix:', error.possibleFixes);
+    // ['Use the allowMultiple flag to allow multiple connected accounts per user']
+  }
+}
+```
+
+#### Invalid Modifier Error
+
+```typescript
+import { ComposioInvalidModifierError } from 'composio-core';
+
+try {
+  const result = await composio.tools.execute(
+    'GITHUB_GET_REPOS',
+    { userId: 'user_123', version: '20250909_00', arguments: {} },
+    {
+      beforeExecute: 'not a function' // Invalid
+    }
+  );
+} catch (error) {
+  if (error instanceof ComposioInvalidModifierError) {
+    console.error('Invalid modifier:', error.message);
+  }
+}
+```
+
+## Tool-Level Errors
+
+When a tool executes but fails, the error is returned in the response object:
+
+```typescript
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: { owner: 'nonexistent-user-xyz' }
+});
+
+if (!result.successful) {
+  console.error('Tool execution failed');
+  console.error('Error:', result.error);
+  console.error('Log ID:', result.logId); // For debugging
+}
+```
+
+### Error Response Structure
+
+```typescript
+interface ToolExecuteResponse {
+  successful: boolean;
+  data: Record<string, unknown> | null;
+  error: {
+    message: string;
+    code?: string;
+    details?: unknown;
+  } | null;
+  logId?: string;
+  sessionInfo?: unknown;
+}
+```
+
+## Comprehensive Error Handling
+
+### Basic Pattern
+
+```typescript
+import {
+  ComposioError,
+  ComposioToolNotFoundError,
+  ComposioConnectedAccountNotFoundError,
+  ComposioToolVersionRequiredError,
+  ValidationError
+} from 'composio-core';
+
+async function executeToolSafely() {
+  try {
+    const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'user_123',
+      version: '20250909_00',
+      arguments: { owner: 'composio' }
+    });
+    
+    // Check tool-level errors
+    if (!result.successful) {
+      console.error('Tool failed:', result.error);
+      return null;
+    }
+    
+    return result.data;
+    
+  } catch (error) {
+    // Handle SDK-level errors
+    if (error instanceof ComposioToolNotFoundError) {
+      console.error('Tool does not exist');
+    } else if (error instanceof ComposioConnectedAccountNotFoundError) {
+      console.error('No connected account found');
+      // Redirect user to connect their account
+    } else if (error instanceof ComposioToolVersionRequiredError) {
+      console.error('Please specify a toolkit version');
+    } else if (error instanceof ValidationError) {
+      console.error('Invalid parameters:', error.possibleFixes);
+    } else if (error instanceof ComposioError) {
+      console.error('Composio error:', error.message);
+      console.error('Code:', error.code);
+    } else {
+      console.error('Unexpected error:', error);
+    }
+    
+    return null;
+  }
+}
+```
+
+### Advanced Error Handling with Retry Logic
+
+```typescript
+import { ComposioToolExecutionError } from 'composio-core';
+
+interface RetryOptions {
+  maxRetries?: number;
+  retryDelay?: number;
+  retryableErrors?: string[];
+}
+
+async function executeWithRetry(
+  toolSlug: string,
+  params: any,
+  options: RetryOptions = {}
+) {
+  const {
+    maxRetries = 3,
+    retryDelay = 1000,
+    retryableErrors = ['RATE_LIMIT', 'TIMEOUT', 'SERVICE_UNAVAILABLE']
+  } = options;
+  
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await composio.tools.execute(toolSlug, params);
+      
+      if (!result.successful) {
+        // Check if error is retryable
+        const errorCode = result.error?.code;
+        if (errorCode && retryableErrors.includes(errorCode) && attempt < maxRetries) {
+          console.warn(`Attempt ${attempt + 1} failed with ${errorCode}, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
+          continue;
+        }
+        
+        // Non-retryable error or max retries reached
+        throw new ComposioToolExecutionError(
+          `Tool execution failed: ${result.error?.message}`,
+          { meta: { error: result.error, logId: result.logId } }
+        );
+      }
+      
+      return result.data;
+      
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry validation or not found errors
+      if (
+        error instanceof ValidationError ||
+        error instanceof ComposioToolNotFoundError ||
+        error instanceof ComposioConnectedAccountNotFoundError
+      ) {
+        throw error;
+      }
+      
+      // Retry on network or temporary errors
+      if (attempt < maxRetries) {
+        console.warn(`Attempt ${attempt + 1} failed, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
+        continue;
+      }
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
+
+// Usage
+try {
+  const data = await executeWithRetry('GITHUB_GET_REPOS', {
+    userId: 'user_123',
+    version: '20250909_00',
+    arguments: { owner: 'composio' }
+  });
+  console.log('Success:', data);
+} catch (error) {
+  console.error('Failed after retries:', error);
+}
+```
+
+### Error Logging and Monitoring
+
+```typescript
+import { ComposioError } from 'composio-core';
+
+class ErrorTracker {
+  static async trackError(error: unknown, context: Record<string, unknown>) {
+    const errorData = {
+      timestamp: new Date().toISOString(),
+      context,
+      ...(error instanceof ComposioError ? {
+        type: error.name,
+        code: error.code,
+        message: error.message,
+        statusCode: error.statusCode,
+        possibleFixes: error.possibleFixes
+      } : {
+        type: 'UnknownError',
+        message: String(error)
+      })
+    };
+    
+    // Log to console
+    console.error('[Error]', errorData);
+    
+    // Send to monitoring service
+    await fetch('https://your-monitoring-service.com/errors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(errorData)
+    });
+  }
+}
+
+// Usage
+try {
+  const result = await composio.tools.execute('GITHUB_GET_REPOS', params);
+} catch (error) {
+  await ErrorTracker.trackError(error, {
+    operation: 'tool_execution',
+    toolSlug: 'GITHUB_GET_REPOS',
+    userId: 'user_123'
+  });
+  throw error;
+}
+```
+
+## Error Recovery Strategies
+
+### Handle Authentication Errors
+
+```typescript
+import { ComposioConnectedAccountNotFoundError } from 'composio-core';
+
+async function executeWithAuthRecovery(toolSlug: string, params: any) {
+  try {
+    return await composio.tools.execute(toolSlug, params);
+  } catch (error) {
+    if (error instanceof ComposioConnectedAccountNotFoundError) {
+      console.log('No connected account found, initiating connection...');
+      
+      // Get auth config for the toolkit
+      const toolkit = toolSlug.split('_')[0].toLowerCase();
+      const authConfigs = await composio.authConfigs.list({ toolkit });
+      
+      if (authConfigs.items.length === 0) {
+        throw new Error(`No auth config found for toolkit: ${toolkit}`);
+      }
+      
+      // Create connection link
+      const connectionRequest = await composio.connectedAccounts.link(
+        params.userId,
+        authConfigs.items[0].id
+      );
+      
+      console.log('Please visit:', connectionRequest.redirectUrl);
+      
+      // Wait for connection
+      const connectedAccount = await connectionRequest.waitForConnection(300000);
+      console.log('Account connected:', connectedAccount.id);
+      
+      // Retry execution
+      return await composio.tools.execute(toolSlug, {
+        ...params,
+        connectedAccountId: connectedAccount.id
+      });
+    }
+    
+    throw error;
+  }
+}
+```
+
+### Handle Rate Limiting
+
+```typescript
+async function executeWithRateLimitHandling(toolSlug: string, params: any) {
+  const result = await composio.tools.execute(toolSlug, params);
+  
+  if (!result.successful && result.error?.code === 'RATE_LIMIT_EXCEEDED') {
+    // Extract retry-after from error details
+    const retryAfter = result.error.details?.retry_after || 60;
+    
+    console.log(`Rate limited. Retrying after ${retryAfter} seconds...`);
+    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+    
+    // Retry
+    return await composio.tools.execute(toolSlug, params);
+  }
+  
+  return result;
+}
+```
+
+### Handle Token Refresh
+
+```typescript
+async function executeWithTokenRefresh(toolSlug: string, params: any) {
+  let result = await composio.tools.execute(toolSlug, params);
+  
+  if (!result.successful && result.error?.code === 'AUTHENTICATION_FAILED') {
+    console.log('Authentication failed, refreshing token...');
+    
+    // Refresh the connected account
+    if (params.connectedAccountId) {
+      await composio.connectedAccounts.refresh(params.connectedAccountId);
+      
+      // Retry execution
+      result = await composio.tools.execute(toolSlug, params);
+    }
+  }
+  
+  return result;
+}
+```
+
+## Pretty Printing Errors
+
+ComposioError has a built-in pretty print method:
+
+```typescript
+import { ComposioError } from 'composio-core';
+
+try {
+  await composio.tools.execute('INVALID_TOOL', params);
+} catch (error) {
+  if (error instanceof ComposioError) {
+    // Pretty print with colors and formatting
+    error.prettyPrint(true); // true includes stack trace
+    /*
+    Output:
+    ERROR Tool not found
+    Error Code: TS-SDK::TOOL_NOT_FOUND
+    
+    Try the following:
+     1. Ensure the tool slug is correct and exists in the Composio project
+    
+    Stack Trace:
+    ...
+    */
+  }
+}
+```
+
+### Custom Error Display
+
+```typescript
+function displayError(error: unknown) {
+  if (error instanceof ComposioError) {
+    console.log('\n=== Error Details ===');
+    console.log('Type:', error.name);
+    console.log('Message:', error.message);
+    
+    if (error.code) {
+      console.log('Code:', error.code);
+    }
+    
+    if (error.statusCode) {
+      console.log('Status:', error.statusCode);
+    }
+    
+    if (error.possibleFixes && error.possibleFixes.length > 0) {
+      console.log('\nSuggested fixes:');
+      error.possibleFixes.forEach((fix, i) => {
+        console.log(`  ${i + 1}. ${fix}`);
+      });
+    }
+    
+    console.log('===================\n');
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Connection Request Errors
+
+```typescript
+import {
+  ConnectionRequestFailedError,
+  ConnectionRequestTimeoutError
+} from 'composio-core';
+
+try {
+  const connectionRequest = await composio.connectedAccounts.link(
+    'user_123',
+    authConfigId
+  );
+  
+  const connectedAccount = await connectionRequest.waitForConnection(60000);
+  
+} catch (error) {
+  if (error instanceof ConnectionRequestTimeoutError) {
+    console.error('User did not complete authentication in time');
+    // Show message to user
+  } else if (error instanceof ConnectionRequestFailedError) {
+    console.error('Authentication failed:', error.message);
+    // Show error and retry option
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Check Both Levels" icon="layer-group">
+    Check for SDK exceptions AND tool-level errors in responses.
+  </Card>
+  
+  <Card title="Use Type Guards" icon="shield">
+    Use `instanceof` checks to handle specific error types appropriately.
+  </Card>
+  
+  <Card title="Log Context" icon="clipboard-list">
+    Include context (toolSlug, userId, etc.) when logging errors.
+  </Card>
+  
+  <Card title="Implement Retry Logic" icon="rotate">
+    Add retry logic for transient errors like rate limits and timeouts.
+  </Card>
+</CardGroup>
+
+## Error Handling Checklist
+
+- [ ] Wrap tool execution in try-catch blocks
+- [ ] Check `result.successful` before using `result.data`
+- [ ] Handle specific error types (ValidationError, ToolNotFoundError, etc.)
+- [ ] Implement retry logic for transient errors
+- [ ] Log errors with sufficient context for debugging
+- [ ] Use `result.logId` to trace tool execution in Composio dashboard
+- [ ] Provide user-friendly error messages
+- [ ] Implement fallback behavior when tools fail
+- [ ] Monitor error rates and types in production
+- [ ] Use pretty printing during development
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool Execution" icon="play" href="/guides/tool-execution">
+    Learn about tool execution patterns
+  </Card>
+  
+  <Card title="Authentication Flows" icon="key" href="/guides/authentication-flows">
+    Handle authentication-related errors
+  </Card>
+  
+  <Card title="Modifiers" icon="sliders" href="/guides/modifiers">
+    Use modifiers for custom error handling
+  </Card>
+  
+  <Card title="Environment Variables" icon="key" href="/guides/environment-variables">
+    Configure error behavior via environment
+  </Card>
+</CardGroup>

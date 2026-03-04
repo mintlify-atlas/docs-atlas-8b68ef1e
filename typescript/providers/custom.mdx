@@ -1,0 +1,269 @@
+---
+title: Custom Provider
+description: Build your own provider for any AI framework
+---
+
+Create a custom provider to integrate Composio with any AI framework.
+
+## Provider Types
+
+Composio supports two types of providers:
+
+### 1. Non-Agentic Providers
+
+For frameworks where you manually handle tool execution (OpenAI, Anthropic, etc.):
+
+```typescript
+import { BaseNonAgenticProvider, Tool } from '@composio/core';
+
+export class MyProvider extends BaseNonAgenticProvider<
+  MyToolCollection,
+  MyTool,
+  MyMcpServerResponse
+> {
+  readonly name = 'my-provider';
+
+  wrapTool(tool: Tool): MyTool {
+    return {
+      name: tool.slug,
+      description: tool.description,
+      parameters: tool.inputParameters
+    };
+  }
+
+  wrapTools(tools: Tool[]): MyToolCollection {
+    return tools.map(tool => this.wrapTool(tool));
+  }
+
+  async executeToolCall(
+    userId: string,
+    toolCall: MyToolCall,
+    options?: ExecuteToolFnOptions
+  ): Promise<string> {
+    const result = await this.executeTool(toolCall.name, {
+      userId,
+      arguments: toolCall.arguments
+    });
+    return JSON.stringify(result);
+  }
+}
+```
+
+### 2. Agentic Providers
+
+For frameworks that handle execution automatically (LangChain, LlamaIndex, etc.):
+
+```typescript
+import { BaseAgenticProvider, Tool, ExecuteToolFn } from '@composio/core';
+
+export class MyAgenticProvider extends BaseAgenticProvider<
+  MyToolCollection,
+  MyTool,
+  MyMcpServerResponse
+> {
+  readonly name = 'my-agentic-provider';
+
+  wrapTool(tool: Tool, executeTool: ExecuteToolFn): MyTool {
+    return {
+      name: tool.slug,
+      description: tool.description,
+      parameters: tool.inputParameters,
+      execute: async (input: Record<string, unknown>) => {
+        const result = await executeTool(tool.slug, input);
+        return result;
+      }
+    };
+  }
+
+  wrapTools(tools: Tool[], executeTool: ExecuteToolFn): MyToolCollection {
+    return tools.map(tool => this.wrapTool(tool, executeTool));
+  }
+}
+```
+
+## Complete Example
+
+Here's a complete custom provider for a hypothetical framework:
+
+```typescript
+import {
+  BaseNonAgenticProvider,
+  Tool,
+  ToolExecuteParams,
+  ExecuteToolModifiers,
+  ExecuteToolFnOptions
+} from '@composio/core';
+
+// Define your framework's tool types
+interface MyFrameworkTool {
+  id: string;
+  description: string;
+  schema: Record<string, unknown>;
+}
+
+type MyFrameworkToolCollection = MyFrameworkTool[];
+
+export class MyFrameworkProvider extends BaseNonAgenticProvider<
+  MyFrameworkToolCollection,
+  MyFrameworkTool,
+  unknown
+> {
+  readonly name = 'my-framework';
+
+  // Transform a Composio tool to your framework's format
+  wrapTool(tool: Tool): MyFrameworkTool {
+    return {
+      id: tool.slug,
+      description: tool.description || '',
+      schema: tool.inputParameters || {}
+    };
+  }
+
+  // Transform a list of tools
+  wrapTools(tools: Tool[]): MyFrameworkToolCollection {
+    return tools.map(tool => this.wrapTool(tool));
+  }
+
+  // Execute a tool call from your framework
+  async executeToolCall(
+    userId: string,
+    toolCall: { name: string; arguments: Record<string, unknown> },
+    options?: ExecuteToolFnOptions,
+    modifiers?: ExecuteToolModifiers
+  ): Promise<string> {
+    const payload: ToolExecuteParams = {
+      arguments: toolCall.arguments,
+      connectedAccountId: options?.connectedAccountId,
+      userId
+    };
+
+    const result = await this.executeTool(toolCall.name, payload, modifiers);
+    return JSON.stringify(result);
+  }
+}
+```
+
+## Usage
+
+```typescript
+import { Composio } from '@composio/core';
+import { MyFrameworkProvider } from './my-provider';
+
+const composio = new Composio({
+  apiKey: 'your-key',
+  provider: new MyFrameworkProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+// Tools are now in your framework's format
+console.log(tools[0].id); // 'GITHUB_CREATE_ISSUE'
+```
+
+## Key Methods
+
+### wrapTool()
+
+Transforms a single Composio tool to your framework's format:
+
+```typescript
+wrapTool(tool: Tool): MyTool {
+  return {
+    // Map Composio tool properties to your format
+    name: tool.slug,
+    description: tool.description,
+    parameters: tool.inputParameters
+  };
+}
+```
+
+### wrapTools()
+
+Transforms multiple tools:
+
+```typescript
+wrapTools(tools: Tool[]): MyToolCollection {
+  return tools.map(tool => this.wrapTool(tool));
+}
+```
+
+### executeToolCall() (Non-Agentic)
+
+Handles tool execution for non-agentic providers:
+
+```typescript
+async executeToolCall(
+  userId: string,
+  toolCall: MyToolCall,
+  options?: ExecuteToolFnOptions,
+  modifiers?: ExecuteToolModifiers
+): Promise<string> {
+  const result = await this.executeTool(toolCall.name, {
+    userId,
+    arguments: toolCall.arguments,
+    connectedAccountId: options?.connectedAccountId
+  }, modifiers);
+  
+  return JSON.stringify(result);
+}
+```
+
+## Type Parameters
+
+Providers are generic over three types:
+
+1. **TToolCollection**: Your framework's tool collection type
+2. **TTool**: Your framework's single tool type
+3. **TMcpServerResponse**: MCP server response format (optional)
+
+```typescript
+export class MyProvider extends BaseNonAgenticProvider<
+  MyToolCollection,    // Tool collection type
+  MyTool,             // Single tool type
+  MyMcpServerResponse // MCP response type
+> {
+  // ...
+}
+```
+
+## Best Practices
+
+1. **Type Safety**: Use TypeScript for type-safe implementations
+2. **Error Handling**: Wrap tool execution in try-catch
+3. **Schema Conversion**: Properly convert JSON schemas
+4. **Documentation**: Document your provider's usage
+5. **Testing**: Write tests for your provider
+
+## Publishing
+
+Publish your provider as an npm package:
+
+```json
+{
+  "name": "@yourorg/composio-my-framework",
+  "version": "1.0.0",
+  "peerDependencies": {
+    "@composio/core": "^1.0.0",
+    "your-framework": "^1.0.0"
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Base Provider Source" icon="code" href="https://github.com/composioHQ/composio/blob/master/typescript/packages/core/src/provider/BaseProvider.ts">
+    View base provider code
+  </Card>
+  <Card title="OpenAI Provider" icon="brain" href="/typescript/providers/openai">
+    Example provider implementation
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/composioHQ/composio">
+    Contribute your provider
+  </Card>
+</CardGroup>

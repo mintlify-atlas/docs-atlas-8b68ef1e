@@ -1,0 +1,86 @@
+---
+title: Mastra Provider
+description: Use Composio tools with Mastra.ai framework
+---
+
+The Mastra provider wraps Composio tools for use with the Mastra.ai framework.
+
+## Installation
+
+```bash
+npm install @composio/mastra @mastra/core
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { MastraProvider } from '@composio/mastra';
+import { Mastra } from '@mastra/core';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new MastraProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const mastra = new Mastra({ tools });
+
+const result = await mastra.run({
+  prompt: 'Create a GitHub issue'
+});
+```
+
+## Strict Mode
+
+Enable strict mode to remove non-required properties:
+
+```typescript
+const composio = new Composio({
+  apiKey: 'your-key',
+  provider: new MastraProvider({ strict: true })
+});
+```
+
+## Tool Format
+
+Tools are wrapped in Mastra's tool format:
+
+```typescript
+import { createTool } from '@mastra/core/tools';
+
+// Each tool is wrapped as:
+const tool = createTool({
+  id: 'GITHUB_CREATE_ISSUE',
+  description: 'Create a new GitHub issue',
+  inputSchema: zodSchema,
+  outputSchema: zodSchema,
+  execute: async (input, context) => {
+    return result;
+  }
+});
+```
+
+## Tool Collection
+
+Tools are organized in a dictionary:
+
+```typescript
+interface MastraToolCollection {
+  [key: string]: MastraTool;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Vercel AI SDK" icon="bolt" href="/typescript/providers/vercel">
+    Alternative framework
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+</CardGroup>

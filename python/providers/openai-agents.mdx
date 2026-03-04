@@ -1,0 +1,27 @@
+---
+title: OpenAI Agents
+description: Use Composio with OpenAI Agents SDK
+---
+
+## Installation
+
+```bash
+pip install composio-openai openai-agents
+```
+
+## Usage
+
+```python
+from composio import Composio
+from composio_openai import OpenAIProvider
+from openai import OpenAI
+
+composio = Composio(provider=OpenAIProvider())
+openai_client = OpenAI()
+
+# Get tools for OpenAI Agents
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with OpenAI Agents SDK
+# ...
+```

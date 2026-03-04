@@ -1,0 +1,398 @@
+---
+title: Auth Configs API
+description: Manage authentication configurations for toolkits
+---
+
+The `authConfigs` API manages authentication configurations that define how users authenticate with toolkits. Each auth config specifies the authentication method (OAuth2, API Key, Basic, etc.) and credentials.
+
+## Methods
+
+### list()
+
+List authentication configurations.
+
+```typescript
+async list(query?: AuthConfigListParams): Promise<AuthConfigListResponse>
+```
+
+<ParamField path="query" type="AuthConfigListParams" optional>
+  <Expandable title="properties">
+    <ParamField path="toolkit" type="string">
+      Filter by toolkit slug
+    </ParamField>
+    <ParamField path="isComposioManaged" type="boolean">
+      Filter by management type
+    </ParamField>
+    <ParamField path="cursor" type="string">
+      Pagination cursor
+    </ParamField>
+    <ParamField path="limit" type="number">
+      Maximum results
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="List all configs">
+    ```typescript
+    const configs = await composio.authConfigs.list();
+
+    configs.items.forEach(config => {
+      console.log(config.id, config.name, config.toolkit.slug);
+    });
+    ```
+  </Tab>
+  <Tab title="Filter by toolkit">
+    ```typescript
+    const githubConfigs = await composio.authConfigs.list({
+      toolkit: 'github'
+    });
+    ```
+  </Tab>
+  <Tab title="Composio-managed only">
+    ```typescript
+    const managedConfigs = await composio.authConfigs.list({
+      isComposioManaged: true
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### get()
+
+Retrieve a specific auth config by ID.
+
+```typescript
+async get(nanoid: string): Promise<AuthConfigRetrieveResponse>
+```
+
+<ParamField path="nanoid" type="string" required>
+  Auth config ID
+</ParamField>
+
+**Example:**
+
+```typescript
+const config = await composio.authConfigs.get('auth_abc123');
+
+console.log(config.name); // "GitHub OAuth"
+console.log(config.toolkit.slug); // "github"
+console.log(config.authScheme); // "OAUTH2"
+```
+
+### create()
+
+Create a new auth config.
+
+```typescript
+async create(
+  toolkit: string,
+  options?: CreateAuthConfigParams
+): Promise<CreateAuthConfigResponse>
+```
+
+<ParamField path="toolkit" type="string" required>
+  Toolkit slug to create config for
+</ParamField>
+
+<ParamField path="options" type="CreateAuthConfigParams" optional>
+  <Expandable title="properties">
+    <ParamField path="type" type="string" required>
+      `use_composio_managed_auth` or `use_custom_auth`
+    </ParamField>
+    <ParamField path="name" type="string">
+      Human-readable name
+    </ParamField>
+    <ParamField path="authScheme" type="AuthSchemeType">
+      Auth type (for custom auth): `OAUTH2`, `API_KEY`, `BASIC`, etc.
+    </ParamField>
+    <ParamField path="credentials" type="Record<string, unknown>">
+      Auth credentials (for custom auth)
+    </ParamField>
+    <ParamField path="isEnabledForToolRouter" type="boolean">
+      Enable for Tool Router
+    </ParamField>
+    <ParamField path="toolAccessConfig" type="object">
+      Tool access restrictions
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Composio-managed auth">
+    ```typescript
+    const config = await composio.authConfigs.create('github', {
+      type: 'use_composio_managed_auth',
+      name: 'GitHub OAuth (Composio)'
+    });
+
+    console.log('Created:', config.id);
+    ```
+  </Tab>
+  <Tab title="Custom OAuth2">
+    ```typescript
+    const config = await composio.authConfigs.create('github', {
+      type: 'use_custom_auth',
+      name: 'GitHub OAuth (Custom)',
+      authScheme: 'OAUTH2',
+      credentials: {
+        client_id: 'your_client_id',
+        client_secret: 'your_client_secret',
+        scopes: ['repo', 'user']
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="API Key auth">
+    ```typescript
+    const config = await composio.authConfigs.create('openai', {
+      type: 'use_custom_auth',
+      name: 'OpenAI API Key',
+      authScheme: 'API_KEY',
+      credentials: {
+        api_key: 'sk-...' // Your API key
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="With tool restrictions">
+    ```typescript
+    const config = await composio.authConfigs.create('github', {
+      type: 'use_custom_auth',
+      name: 'GitHub Limited',
+      authScheme: 'OAUTH2',
+      credentials: { /* ... */ },
+      toolAccessConfig: {
+        toolsForConnectedAccountCreation: [
+          'GITHUB_GET_REPOS',
+          'GITHUB_CREATE_ISSUE'
+        ]
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### update()
+
+Update an existing auth config.
+
+```typescript
+async update(
+  nanoid: string,
+  data: AuthConfigUpdateParams
+): Promise<AuthConfigUpdateResponse>
+```
+
+<ParamField path="nanoid" type="string" required>
+  Auth config ID
+</ParamField>
+
+<ParamField path="data" type="AuthConfigUpdateParams" required>
+  <Expandable title="properties">
+    <ParamField path="type" type="string" required>
+      `custom` or `default`
+    </ParamField>
+    <ParamField path="credentials" type="Record<string, unknown>">
+      Updated credentials (for custom type)
+    </ParamField>
+    <ParamField path="scopes" type="string[]">
+      Updated scopes (for default type)
+    </ParamField>
+    <ParamField path="isEnabledForToolRouter" type="boolean">
+      Enable/disable for Tool Router
+    </ParamField>
+    <ParamField path="toolAccessConfig" type="object">
+      Tool access restrictions
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Update credentials">
+    ```typescript
+    await composio.authConfigs.update('auth_abc123', {
+      type: 'custom',
+      credentials: {
+        client_id: 'new_client_id',
+        client_secret: 'new_client_secret'
+      }
+    });
+    ```
+  </Tab>
+  <Tab title="Update scopes">
+    ```typescript
+    await composio.authConfigs.update('auth_abc123', {
+      type: 'default',
+      scopes: ['repo', 'user', 'admin:org']
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### delete()
+
+Delete an auth config.
+
+```typescript
+async delete(nanoid: string): Promise<AuthConfigDeleteResponse>
+```
+
+<Warning>
+  Deleting an auth config will prevent connected accounts using it from functioning.
+</Warning>
+
+**Example:**
+
+```typescript
+await composio.authConfigs.delete('auth_abc123');
+console.log('Auth config deleted');
+```
+
+### enable() / disable()
+
+Enable or disable an auth config.
+
+```typescript
+async enable(nanoid: string): Promise<AuthConfigUpdateStatusResponse>
+async disable(nanoid: string): Promise<AuthConfigUpdateStatusResponse>
+```
+
+**Example:**
+
+```typescript
+// Disable an auth config temporarily
+await composio.authConfigs.disable('auth_abc123');
+
+// Re-enable it
+await composio.authConfigs.enable('auth_abc123');
+```
+
+### updateStatus()
+
+Update auth config status.
+
+```typescript
+async updateStatus(
+  status: 'ENABLED' | 'DISABLED',
+  nanoid: string
+): Promise<AuthConfigUpdateStatusResponse>
+```
+
+**Example:**
+
+```typescript
+await composio.authConfigs.updateStatus('DISABLED', 'auth_abc123');
+```
+
+## Types
+
+### AuthConfigRetrieveResponse
+
+```typescript
+interface AuthConfigRetrieveResponse {
+  id: string; // Config ID
+  name: string; // Config name
+  toolkit: { // Associated toolkit
+    slug: string;
+    name: string;
+  };
+  authScheme: AuthSchemeType; // Auth type
+  isComposioManaged: boolean; // Managed by Composio
+  isEnabledForToolRouter: boolean; // Available in Tool Router
+  status: 'ENABLED' | 'DISABLED';
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+}
+```
+
+### AuthSchemeType
+
+```typescript
+type AuthSchemeType =
+  | 'OAUTH2' // OAuth 2.0
+  | 'OAUTH1' // OAuth 1.0a
+  | 'API_KEY' // API key
+  | 'BASIC' // Basic auth (username/password)
+  | 'BEARER_TOKEN' // Bearer token
+  | 'NO_AUTH'; // No authentication required
+```
+
+### CreateAuthConfigParams
+
+```typescript
+type CreateAuthConfigParams =
+  | {
+      type: 'use_composio_managed_auth';
+      name?: string;
+      isEnabledForToolRouter?: boolean;
+      toolAccessConfig?: ToolAccessConfig;
+    }
+  | {
+      type: 'use_custom_auth';
+      name: string;
+      authScheme: AuthSchemeType;
+      credentials: Record<string, unknown>;
+      isEnabledForToolRouter?: boolean;
+      proxyConfig?: ProxyConfig;
+      toolAccessConfig?: ToolAccessConfig;
+    };
+```
+
+## Common Auth Schemes
+
+### OAuth2
+
+Required credentials:
+```typescript
+{
+  client_id: string;
+  client_secret: string;
+  scopes?: string[]; // Optional scopes
+}
+```
+
+### API Key
+
+Required credentials:
+```typescript
+{
+  api_key: string;
+}
+```
+
+### Basic Auth
+
+Required credentials:
+```typescript
+{
+  username: string;
+  password: string;
+}
+```
+
+### Bearer Token
+
+Required credentials:
+```typescript
+{
+  token: string;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Create user connections
+  </Card>
+  <Card title="Toolkits" icon="box" href="/typescript/api/toolkits">
+    Browse available toolkits
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Execute tools
+  </Card>
+  <Card title="Tool Router" icon="route" href="/typescript/advanced/tool-router">
+    Intelligent connection management
+  </Card>
+</CardGroup>

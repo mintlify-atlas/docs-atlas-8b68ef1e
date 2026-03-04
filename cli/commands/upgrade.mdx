@@ -1,0 +1,280 @@
+---
+title: composio upgrade
+description: Update the Composio CLI to the latest version
+---
+
+The `composio upgrade` command updates your CLI installation to the latest available version.
+
+## Usage
+
+```bash
+composio upgrade
+```
+
+## Description
+
+The upgrade command:
+
+1. **Fetches** the latest release from GitHub
+2. **Compares** with your current version
+3. **Downloads** the appropriate binary for your platform
+4. **Replaces** the existing binary with the new version
+5. **Verifies** the installation
+
+## Examples
+
+### Basic Upgrade
+
+```bash
+composio upgrade
+```
+
+**Output (when upgrade available):**
+
+```
+┌  composio upgrade
+│
+◇  Current version: 0.1.30
+◇  Latest version: 0.1.33
+│
+◆  Downloading composio-darwin-aarch64.zip...
+│  [████████████████████████████████] 100%
+│
+◇  Download complete
+◇  Extracting binary...
+◇  Installing to ~/.composio/bin/composio
+│
+◇  Successfully upgraded to 0.1.33
+│
+└  Done
+```
+
+**Output (when already up-to-date):**
+
+```
+┌  composio upgrade
+│
+◇  You're already running the latest version (0.1.33)
+│
+└  Done
+```
+
+### Verify Upgrade
+
+```bash
+composio upgrade
+composio version
+```
+
+Confirms the new version is installed.
+
+## Platform Detection
+
+The upgrade command automatically detects your platform and downloads the appropriate binary:
+
+| Platform | Architecture | Binary |
+|----------|--------------|--------|
+| Linux | x86_64 | `composio-linux-x64.zip` |
+| Linux | ARM64 | `composio-linux-aarch64.zip` |
+| macOS | Intel | `composio-darwin-x64.zip` |
+| macOS | Apple Silicon | `composio-darwin-aarch64.zip` |
+
+<Warning>
+  Windows is not supported. Use WSL or install via npm (`npm install -g @composio/cli`).
+</Warning>
+
+## Release Tags
+
+CLI binaries are published as GitHub release assets with the tag format:
+
+```
+@composio/cli@<semver>
+```
+
+**Example:** `@composio/cli@0.1.33`
+
+<Note>
+  Legacy `v<semver>` tags (e.g., `v0.1.24`) are supported during the migration period for backward compatibility.
+</Note>
+
+## Environment Variables
+
+The `upgrade` command supports these environment variables for customization:
+
+<ParamField path="COMPOSIO_GITHUB_API_BASE_URL" type="string" default="https://api.github.com">
+  GitHub API base URL (useful for GitHub Enterprise)
+</ParamField>
+
+<ParamField path="COMPOSIO_GITHUB_OWNER" type="string" default="ComposioHQ">
+  GitHub repository owner
+</ParamField>
+
+<ParamField path="COMPOSIO_GITHUB_REPO" type="string" default="composio">
+  GitHub repository name
+</ParamField>
+
+<ParamField path="COMPOSIO_GITHUB_TAG" type="string" default="latest">
+  Specific release tag to upgrade to
+</ParamField>
+
+<ParamField path="COMPOSIO_GITHUB_ACCESS_TOKEN" type="string">
+  GitHub access token (prevents rate limiting during development)
+</ParamField>
+
+<ParamField path="DEBUG_OVERRIDE_VERSION" type="string">
+  Override version for debugging (development use only)
+</ParamField>
+
+### Examples
+
+#### Upgrade to Specific Version
+
+```bash
+COMPOSIO_GITHUB_TAG='@composio/cli@0.1.24' composio upgrade
+```
+
+Downloads and installs version 0.1.24 instead of the latest.
+
+#### Custom GitHub API (Enterprise)
+
+```bash
+export COMPOSIO_GITHUB_API_BASE_URL="https://github.company.com/api/v3"
+export COMPOSIO_GITHUB_ACCESS_TOKEN="ghp_your_token"
+composio upgrade
+```
+
+Uses a GitHub Enterprise instance.
+
+#### Avoid Rate Limiting
+
+```bash
+export COMPOSIO_GITHUB_ACCESS_TOKEN="ghp_your_token"
+composio upgrade
+```
+
+Provides a GitHub token to increase API rate limits.
+
+## Installation Location
+
+The upgrade replaces the binary at:
+
+```
+~/.composio/bin/composio
+```
+
+Or the location specified by `COMPOSIO_INSTALL` during initial installation.
+
+## Version Comparison
+
+The CLI uses semantic versioning (semver) to compare versions:
+
+- **Major:** Breaking changes (e.g., 1.0.0 → 2.0.0)
+- **Minor:** New features (e.g., 0.1.0 → 0.2.0)
+- **Patch:** Bug fixes (e.g., 0.1.0 → 0.1.1)
+
+The upgrade only proceeds if a newer version is available.
+
+## Troubleshooting
+
+### Permission Denied
+
+If you get permission errors during upgrade:
+
+```bash
+chmod +x ~/.composio/bin/composio
+```
+
+Or run the upgrade with appropriate permissions:
+
+```bash
+sudo composio upgrade
+```
+
+### Download Failures
+
+If the download fails:
+
+**1. Check internet connection**
+
+**2. Verify GitHub access:**
+
+```bash
+curl -I https://api.github.com/repos/ComposioHQ/composio/releases/latest
+```
+
+**3. Use a GitHub token to avoid rate limits:**
+
+```bash
+export COMPOSIO_GITHUB_ACCESS_TOKEN="ghp_your_token"
+composio upgrade
+```
+
+### Rate Limiting
+
+GitHub API has rate limits (60 requests/hour for unauthenticated users). If you hit the limit:
+
+```
+Error: GitHub API rate limit exceeded
+```
+
+**Solution:** Provide a GitHub token:
+
+```bash
+export COMPOSIO_GITHUB_ACCESS_TOKEN="ghp_your_token"
+composio upgrade
+```
+
+### Unsupported Platform
+
+If your platform is not supported:
+
+```
+Error: Unsupported platform: win32
+```
+
+**Solution for Windows:** Use WSL or install via npm:
+
+```bash
+npm install -g @composio/cli
+```
+
+## Manual Upgrade
+
+If the automatic upgrade fails, you can manually upgrade:
+
+```bash
+# Download the latest release
+curl -fsSL https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh | bash
+```
+
+This runs the installation script, which handles upgrades automatically.
+
+## Rollback
+
+If you need to downgrade to a previous version:
+
+```bash
+COMPOSIO_GITHUB_TAG='@composio/cli@0.1.30' composio upgrade
+```
+
+Or reinstall from scratch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh | bash -s -- @composio/cli@0.1.30
+```
+
+## Related Commands
+
+- [`composio version`](/cli/commands/version) - Display current version
+- [`composio login`](/cli/commands/login) - Authenticate after upgrade
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="version" icon="tag" href="/cli/commands/version">
+    Check your CLI version
+  </Card>
+  <Card title="Installation" icon="download" href="/cli/installation">
+    Installation guide
+  </Card>
+</CardGroup>

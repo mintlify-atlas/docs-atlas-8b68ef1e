@@ -1,0 +1,198 @@
+---
+title: Installation
+description: Install the Composio Python SDK and provider packages
+---
+
+## Core Package
+
+Install the core Composio SDK:
+
+```bash
+pip install composio-core
+```
+
+Or use the `composio` package which includes the core:
+
+```bash
+pip install composio
+```
+
+## Provider-Specific Packages
+
+For AI framework integrations, install the corresponding provider package:
+
+### OpenAI
+
+```bash
+pip install composio-openai
+```
+
+### Anthropic (Claude)
+
+```bash
+pip install composio-anthropic
+```
+
+### LangChain
+
+```bash
+pip install composio-langchain
+```
+
+### LangGraph
+
+```bash
+pip install composio-langgraph
+```
+
+### LlamaIndex
+
+```bash
+pip install composio-llamaindex
+```
+
+### CrewAI
+
+```bash
+pip install composio-crewai
+```
+
+### AutoGen
+
+```bash
+pip install composio-autogen
+```
+
+### Google AI (Gemini)
+
+```bash
+pip install composio-gemini
+```
+
+### Google Generative AI
+
+```bash
+pip install composio-google
+```
+
+### Google ADK
+
+```bash
+pip install composio-google-adk
+```
+
+## Requirements
+
+- Python 3.10 or higher
+- pip package manager
+
+## Environment Variables
+
+Set up your environment variables:
+
+```bash
+# Required: Your Composio API key
+export COMPOSIO_API_KEY="your-api-key"
+
+# Optional: Custom API base URL
+export COMPOSIO_BASE_URL="https://api.composio.dev"
+
+# Optional: Logging level (silent, error, warn, info, debug)
+export COMPOSIO_LOGGING_LEVEL="info"
+
+# Optional: Disable telemetry
+export COMPOSIO_DISABLE_TELEMETRY="true"
+
+# Optional: Specific toolkit versions
+export COMPOSIO_TOOLKIT_VERSION_GITHUB="20250906_01"
+```
+
+## Verify Installation
+
+Verify your installation:
+
+```python
+import composio
+from composio import Composio
+
+print(f"Composio version: {composio.__version__}")
+
+# Initialize with API key
+client = Composio(api_key="your-api-key")
+print("Successfully initialized Composio SDK")
+```
+
+## Development Installation
+
+For development, clone the repository and install in editable mode:
+
+```bash
+git clone https://github.com/composiohq/composio.git
+cd composio/python
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install in development mode
+make env  # Installs all dependencies including dev tools
+```
+
+## Troubleshooting
+
+### Import Errors
+
+If you encounter import errors, ensure you've installed the correct package:
+
+```python
+# Core SDK
+from composio import Composio
+
+# Provider-specific imports
+from composio_openai import OpenAIProvider
+from composio_anthropic import AnthropicProvider
+from composio_langchain import LangchainProvider
+```
+
+### API Key Issues
+
+If you get `ApiKeyNotProvidedError`, ensure your API key is set:
+
+```python
+import os
+from composio import Composio
+
+# Option 1: Environment variable
+os.environ["COMPOSIO_API_KEY"] = "your-api-key"
+composio = Composio()
+
+# Option 2: Direct initialization
+composio = Composio(api_key="your-api-key")
+```
+
+### Version Conflicts
+
+If you experience version conflicts, use a virtual environment:
+
+```bash
+python -m venv composio-env
+source composio-env/bin/activate
+pip install composio-openai
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/python/overview">
+    Get started with Composio Python SDK
+  </Card>
+  <Card title="Composio Client" icon="code" href="/python/api/composio">
+    Learn about SDK configuration
+  </Card>
+  <Card title="Providers" icon="plug" href="/python/providers/overview">
+    Choose your AI framework integration
+  </Card>
+  <Card title="Tools" icon="wrench" href="/python/api/tools">
+    Start using tools
+  </Card>
+</CardGroup>

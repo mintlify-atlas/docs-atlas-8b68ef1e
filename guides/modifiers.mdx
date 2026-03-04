@@ -1,0 +1,614 @@
+---
+title: Modifiers
+description: Customize tool behavior with before and after execution hooks in Composio
+---
+
+## Overview
+
+Modifiers are powerful hooks that allow you to intercept and transform tool operations at different stages. You can use modifiers to customize request parameters, transform responses, add logging, implement custom caching, and more.
+
+## Types of Modifiers
+
+Composio supports three types of modifiers:
+
+1. **Schema Modifiers** - Transform tool schemas before they're exposed
+2. **Before Execute Modifiers** - Modify parameters before tool execution
+3. **After Execute Modifiers** - Transform responses after tool execution
+
+## Schema Modifiers
+
+Schema modifiers allow you to customize tool metadata, parameters, and descriptions before tools are used.
+
+### Basic Schema Modification
+
+```typescript
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+
+const tools = await composio.tools.getRawComposioTools(
+  {
+    toolkits: ['github']
+  },
+  {
+    modifySchema: ({ toolSlug, toolkitSlug, schema }) => {
+      // Customize the schema
+      return {
+        ...schema,
+        name: `Custom ${schema.name}`,
+        description: `Enhanced: ${schema.description}`,
+        tags: [...(schema.tags || []), 'customized']
+      };
+    }
+  }
+);
+```
+
+### Adding Custom Metadata
+
+```typescript
+const tools = await composio.tools.getRawComposioTools(
+  { tools: ['GITHUB_GET_REPOS'] },
+  {
+    modifySchema: ({ schema, toolSlug }) => {
+      return {
+        ...schema,
+        // Add custom metadata
+        metadata: {
+          organization: 'acme-corp',
+          department: 'engineering',
+          customId: `tool_${toolSlug.toLowerCase()}`
+        },
+        // Enhance descriptions for better AI understanding
+        description: `${schema.description}. This tool is maintained by the engineering team.`,
+        // Add usage examples
+        examples: [
+          {
+            description: 'Get public repositories',
+            arguments: { owner: 'composio', type: 'public' }
+          }
+        ]
+      };
+    }
+  }
+);
+```
+
+### Modifying Input Parameters
+
+```typescript
+const tools = await composio.tools.getRawComposioTools(
+  { tools: ['HACKERNEWS_GET_USER'] },
+  {
+    modifySchema: ({ schema }) => {
+      return {
+        ...schema,
+        inputParameters: {
+          ...schema.inputParameters,
+          properties: {
+            ...schema.inputParameters.properties,
+            userId: {
+              ...schema.inputParameters.properties?.userId,
+              description: 'HackerNews username (2-15 characters)',
+              minLength: 2,
+              maxLength: 15,
+              pattern: '^[a-zA-Z0-9_-]+$'
+            },
+            // Add new optional parameters
+            includeSubmissions: {
+              type: 'boolean',
+              description: 'Include user submissions in response',
+              default: false
+            }
+          },
+          required: [...(schema.inputParameters.required || [])]
+        }
+      };
+    }
+  }
+);
+```
+
+### Tool-Specific Modifications
+
+```typescript
+const tools = await composio.tools.getRawComposioTools(
+  { toolkits: ['github', 'slack'] },
+  {
+    modifySchema: ({ schema, toolSlug, toolkitSlug }) => {
+      // Apply toolkit-specific modifications
+      if (toolkitSlug === 'github') {
+        return {
+          ...schema,
+          name: `GitHub: ${schema.name}`,
+          tags: [...(schema.tags || []), 'version-control', 'github']
+        };
+      }
+      
+      if (toolkitSlug === 'slack') {
+        return {
+          ...schema,
+          name: `Slack: ${schema.name}`,
+          tags: [...(schema.tags || []), 'communication', 'slack']
+        };
+      }
+      
+      // Apply tool-specific modifications
+      if (toolSlug === 'GITHUB_CREATE_ISSUE') {
+        return {
+          ...schema,
+          description: `${schema.description} - Automatically adds organization labels`,
+          metadata: {
+            autoLabels: ['bug', 'internal']
+          }
+        };
+      }
+      
+      return schema;
+    }
+  }
+);
+```
+
+## Before Execute Modifiers
+
+Before execute modifiers intercept and modify parameters before a tool is executed.
+
+### Basic Parameter Modification
+
+```typescript
+const result = await composio.tools.execute(
+  'GITHUB_GET_REPOS',
+  {
+    userId: 'user_123',
+    version: '20250909_00',
+    arguments: {
+      owner: 'composio'
+    }
+  },
+  {
+    beforeExecute: async ({ toolSlug, toolkitSlug, params }) => {
+      console.log(`Executing ${toolSlug} from ${toolkitSlug}`);
+      
+      // Add tracking metadata
+      return {
+        ...params,
+        arguments: {
+          ...params.arguments,
+          per_page: 100 // Always fetch max results
+        }
+      };
+    }
+  }
+);
+```
+
+### Adding Authentication Headers
+
+```typescript
+const beforeExecute = async ({ params, toolSlug }) => {
+  return {
+    ...params,
+    customAuthParams: {
+      ...params.customAuthParams,
+      headers: {
+        ...params.customAuthParams?.headers,
+        'X-Request-ID': generateRequestId(),
+        'X-Tool-Slug': toolSlug,
+        'X-Timestamp': new Date().toISOString()
+      }
+    }
+  };
+};
+
+const result = await composio.tools.execute(
+  'GITHUB_GET_REPOS',
+  { userId: 'user_123', version: '20250909_00', arguments: { owner: 'composio' } },
+  { beforeExecute }
+);
+```
+
+### Conditional Parameter Transformation
+
+```typescript
+const beforeExecute = async ({ toolSlug, params }) => {
+  switch (toolSlug) {
+    case 'GITHUB_SEARCH_REPOS':
+      // Enhance search with additional filters
+      return {
+        ...params,
+        arguments: {
+          ...params.arguments,
+          q: `${params.arguments.query} language:typescript stars:>100`,
+          sort: 'stars',
+          order: 'desc'
+        }
+      };
+    
+    case 'SLACK_SEND_MESSAGE':
+      // Add default channel if not specified
+      return {
+        ...params,
+        arguments: {
+          channel: '#general',
+          ...params.arguments
+        }
+      };
+    
+    default:
+      return params;
+  }
+};
+```
+
+### Input Validation
+
+```typescript
+const beforeExecute = async ({ toolSlug, params }) => {
+  // Validate and sanitize inputs
+  if (toolSlug === 'GITHUB_CREATE_ISSUE') {
+    const { title, body } = params.arguments;
+    
+    if (!title || title.trim().length === 0) {
+      throw new Error('Issue title cannot be empty');
+    }
+    
+    if (title.length > 200) {
+      throw new Error('Issue title too long (max 200 characters)');
+    }
+    
+    return {
+      ...params,
+      arguments: {
+        ...params.arguments,
+        title: title.trim(),
+        body: body?.trim() || 'No description provided'
+      }
+    };
+  }
+  
+  return params;
+};
+```
+
+## After Execute Modifiers
+
+After execute modifiers transform responses after a tool has executed.
+
+### Basic Response Transformation
+
+```typescript
+const result = await composio.tools.execute(
+  'GITHUB_LIST_REPOS',
+  {
+    userId: 'user_123',
+    version: '20250909_00',
+    arguments: { owner: 'composio' }
+  },
+  {
+    afterExecute: async ({ result, toolSlug }) => {
+      if (!result.successful) {
+        return result;
+      }
+      
+      // Transform response data
+      return {
+        ...result,
+        data: {
+          repositories: result.data.items.map(repo => ({
+            name: repo.name,
+            url: repo.html_url,
+            stars: repo.stargazers_count,
+            language: repo.language
+          })),
+          count: result.data.items.length,
+          executedAt: new Date().toISOString()
+        }
+      };
+    }
+  }
+);
+```
+
+### Error Enhancement
+
+```typescript
+const afterExecute = async ({ result, toolSlug, toolkitSlug }) => {
+  if (!result.successful) {
+    // Enhance error with additional context
+    return {
+      ...result,
+      error: {
+        ...result.error,
+        toolSlug,
+        toolkitSlug,
+        timestamp: new Date().toISOString(),
+        retryable: isRetryableError(result.error),
+        suggestedAction: getSuggestedAction(result.error)
+      }
+    };
+  }
+  
+  return result;
+};
+
+function isRetryableError(error) {
+  const retryableCodes = ['RATE_LIMIT', 'TIMEOUT', 'SERVICE_UNAVAILABLE'];
+  return retryableCodes.includes(error?.code);
+}
+
+function getSuggestedAction(error) {
+  switch (error?.code) {
+    case 'RATE_LIMIT':
+      return 'Wait before retrying or use a different account';
+    case 'AUTHENTICATION_FAILED':
+      return 'Refresh the connected account credentials';
+    case 'TIMEOUT':
+      return 'Retry the operation or reduce the request size';
+    default:
+      return 'Check the error details and retry if appropriate';
+  }
+}
+```
+
+### Response Filtering and Enrichment
+
+```typescript
+const afterExecute = async ({ result, toolSlug }) => {
+  if (!result.successful || toolSlug !== 'GITHUB_LIST_REPOS') {
+    return result;
+  }
+  
+  const repos = result.data.items;
+  
+  // Filter and enrich repositories
+  const enrichedRepos = repos
+    .filter(repo => !repo.archived && !repo.disabled)
+    .map(repo => ({
+      ...repo,
+      // Add computed fields
+      isPopular: repo.stargazers_count > 1000,
+      lastUpdated: new Date(repo.updated_at).toLocaleDateString(),
+      mainBranch: repo.default_branch || 'main',
+      // Add health score
+      healthScore: calculateRepoHealth(repo)
+    }));
+  
+  return {
+    ...result,
+    data: {
+      repositories: enrichedRepos,
+      stats: {
+        total: enrichedRepos.length,
+        popular: enrichedRepos.filter(r => r.isPopular).length,
+        languages: [...new Set(enrichedRepos.map(r => r.language))]
+      }
+    }
+  };
+};
+
+function calculateRepoHealth(repo) {
+  let score = 0;
+  if (repo.has_issues) score += 20;
+  if (repo.has_wiki) score += 20;
+  if (repo.description) score += 20;
+  if (repo.license) score += 20;
+  if (repo.topics?.length > 0) score += 20;
+  return score;
+}
+```
+
+### Logging and Monitoring
+
+```typescript
+const afterExecute = async ({ result, toolSlug, toolkitSlug }) => {
+  // Log execution metrics
+  const metrics = {
+    toolSlug,
+    toolkitSlug,
+    successful: result.successful,
+    timestamp: new Date().toISOString(),
+    logId: result.logId
+  };
+  
+  if (result.successful) {
+    console.log('[Tool Success]', metrics);
+    // Send to analytics
+    await analytics.track('tool_execution_success', metrics);
+  } else {
+    console.error('[Tool Error]', { ...metrics, error: result.error });
+    // Send to error tracking
+    await errorTracking.captureError(result.error, metrics);
+  }
+  
+  return result;
+};
+```
+
+## Combining Modifiers
+
+You can use multiple modifiers together for powerful customization:
+
+```typescript
+const tools = await composio.tools.get(
+  'user_123',
+  { toolkits: ['github'] },
+  {
+    // Schema modification
+    modifySchema: ({ schema, toolSlug }) => ({
+      ...schema,
+      name: `Custom ${schema.name}`,
+      metadata: { customId: toolSlug }
+    }),
+    
+    // Before execution
+    beforeExecute: async ({ params, toolSlug }) => {
+      console.log(`Executing: ${toolSlug}`);
+      return {
+        ...params,
+        allowTracing: true // Enable tracing for all tools
+      };
+    },
+    
+    // After execution
+    afterExecute: async ({ result, toolSlug }) => {
+      console.log(`Completed: ${toolSlug}`);
+      return result;
+    }
+  }
+);
+```
+
+## Tool Router Meta Tool Modifiers
+
+For tool router sessions, use session-specific modifiers:
+
+```typescript
+const sessionTools = await composio.toolRouter.getTools(sessionId, {
+  modifySchema: ({ schema, toolSlug }) => ({
+    ...schema,
+    description: `[Session Tool] ${schema.description}`
+  }),
+  
+  beforeExecute: async ({ toolSlug, sessionId, params }) => {
+    console.log(`Executing ${toolSlug} in session ${sessionId}`);
+    return {
+      ...params,
+      sessionMetadata: {
+        sessionId,
+        timestamp: Date.now()
+      }
+    };
+  },
+  
+  afterExecute: async ({ result, toolSlug, sessionId }) => {
+    console.log(`Completed ${toolSlug} in session ${sessionId}`);
+    return {
+      ...result,
+      sessionInfo: {
+        sessionId,
+        completedAt: new Date().toISOString()
+      }
+    };
+  }
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Keep Modifiers Pure" icon="code">
+    Avoid side effects in modifiers. Return new objects instead of mutating existing ones.
+  </Card>
+  
+  <Card title="Handle Errors Gracefully" icon="shield">
+    Wrap modifier logic in try-catch blocks to prevent breaking tool execution.
+  </Card>
+  
+  <Card title="Use Type Safety" icon="check">
+    Leverage TypeScript types to ensure modifier functions match expected signatures.
+  </Card>
+  
+  <Card title="Performance Matters" icon="gauge">
+    Keep modifiers lightweight. Heavy operations should be async and properly awaited.
+  </Card>
+</CardGroup>
+
+## Common Use Cases
+
+### Caching Responses
+
+```typescript
+const cache = new Map();
+
+const cacheModifiers = {
+  beforeExecute: async ({ toolSlug, params }) => {
+    const cacheKey = `${toolSlug}:${JSON.stringify(params.arguments)}`;
+    if (cache.has(cacheKey)) {
+      console.log('Cache hit:', cacheKey);
+    }
+    return params;
+  },
+  
+  afterExecute: async ({ result, toolSlug, params }) => {
+    if (result.successful) {
+      const cacheKey = `${toolSlug}:${JSON.stringify(params.arguments)}`;
+      cache.set(cacheKey, result.data);
+    }
+    return result;
+  }
+};
+```
+
+### Rate Limiting
+
+```typescript
+const rateLimiter = new Map();
+
+const rateLimitModifier = async ({ toolSlug, params }) => {
+  const now = Date.now();
+  const lastCall = rateLimiter.get(toolSlug) || 0;
+  const minInterval = 1000; // 1 second between calls
+  
+  if (now - lastCall < minInterval) {
+    const waitTime = minInterval - (now - lastCall);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  rateLimiter.set(toolSlug, Date.now());
+  return params;
+};
+```
+
+### Request/Response Logging
+
+```typescript
+const loggingModifiers = {
+  beforeExecute: async ({ toolSlug, params }) => {
+    console.log(`[${new Date().toISOString()}] Executing ${toolSlug}`, {
+      arguments: params.arguments,
+      userId: params.userId
+    });
+    return params;
+  },
+  
+  afterExecute: async ({ result, toolSlug }) => {
+    console.log(`[${new Date().toISOString()}] Completed ${toolSlug}`, {
+      successful: result.successful,
+      dataSize: JSON.stringify(result.data || {}).length
+    });
+    return result;
+  }
+};
+```
+
+## Limitations
+
+<Warning>
+  - Modifiers must be synchronous or return Promises
+  - Throwing errors in modifiers will prevent tool execution
+  - Schema modifiers don't validate the modified schema
+  - Modifiers are not persisted and must be provided with each operation
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool Execution" icon="play" href="/guides/tool-execution">
+    Apply modifiers to tool execution
+  </Card>
+  
+  <Card title="Custom Tools" icon="wrench" href="/guides/custom-tools">
+    Use modifiers with custom tools
+  </Card>
+  
+  <Card title="File Handling" icon="file" href="/guides/file-handling">
+    Learn about automatic file upload/download modifiers
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Handle errors in modifiers
+  </Card>
+</CardGroup>

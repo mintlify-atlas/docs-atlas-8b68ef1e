@@ -1,0 +1,315 @@
+---
+title: composio generate
+description: Auto-detect project type and generate type-safe code for tools, toolkits, and triggers
+---
+
+The `composio generate` command automatically detects your project language (TypeScript or Python) and generates type-safe code for Composio toolkits, tools, and triggers.
+
+## Usage
+
+```bash
+composio generate [OPTIONS]
+```
+
+## Description
+
+The `generate` command:
+
+1. **Auto-detects** your project language by scanning for:
+   - TypeScript: `package.json`, `tsconfig.json`, `package-lock.json`, `pnpm-lock.yaml`, `bun.lockb`
+   - Python: `pyproject.toml`, `requirements.txt`, `Pipfile`, `poetry.lock`
+
+2. **Delegates** to the appropriate generator:
+   - TypeScript → `composio ts generate`
+   - Python → `composio py generate`
+
+3. **Generates** type definitions for:
+   - **Toolkits** - Collections of related tools (e.g., `github`, `gmail`, `slack`)
+   - **Tools** - Individual functions (e.g., `GITHUB_CREATE_REPO`, `GMAIL_SEND_EMAIL`)
+   - **Triggers** - Event listeners for external services
+
+## Options
+
+<ParamField path="--output-dir, -o" type="string">
+  Output directory for generated type stubs. 
+  
+  - **TypeScript:** Defaults to `node_modules/@composio/core/generated/`
+  - **Python:** Defaults to current directory
+</ParamField>
+
+<ParamField path="--type-tools" type="boolean" default="false">
+  **TypeScript only.** Generate typed input/output schemas for each tool.
+  
+  <Warning>
+    Enables full type definitions but is slower. Fetches complete tool schemas from the API.
+  </Warning>
+</ParamField>
+
+<ParamField path="--toolkits" type="string[]">
+  Only generate types for specific toolkits. Can be specified multiple times.
+  
+  **Example:**
+  ```bash
+  composio generate --toolkits gmail --toolkits slack
+  ```
+</ParamField>
+
+## Examples
+
+### Basic Generation
+
+```bash
+composio generate
+```
+
+**Output:**
+
+```
+┌  composio ts generate
+│
+◇  Project type detected: TypeScript
+◇  Writing type stubs to node_modules/@composio/core/generated
+│
+◆  Fetching data from Composio API...
+│  Found 150 toolkit(s)
+│  Generating TypeScript type stubs...
+│  Writing files to disk...
+│  Transpiling to JavaScript...
+│
+◇  Type stubs generated successfully
+│
+┌────────────────────────────────────────────────────────┐
+│ Import your generated types                            │
+├────────────────────────────────────────────────────────┤
+│ import { Toolkits } from "@composio/core/generated"    │
+└────────────────────────────────────────────────────────┘
+│
+◇  API Metrics: 4 requests, 2.5 MB transferred
+│
+└  Done
+```
+
+### Generate for Specific Toolkits
+
+```bash
+composio generate --toolkits github --toolkits gmail --toolkits slack
+```
+
+Fetches and generates types for only the specified toolkits (faster than full generation).
+
+### Custom Output Directory
+
+```bash
+composio generate --output-dir ./composio-types
+```
+
+Writes generated files to `./composio-types/` instead of the default location.
+
+### Generate with Full Type Definitions (TypeScript)
+
+```bash
+composio generate --type-tools
+```
+
+Generates complete input/output schemas for each tool (slower but provides full type safety).
+
+## Language-Specific Behavior
+
+### TypeScript Projects
+
+When detected, runs:
+
+```bash
+composio ts generate [OPTIONS]
+```
+
+**Generated files:**
+
+```
+node_modules/@composio/core/generated/
+├── index.ts
+├── index.js         # Transpiled (default)
+├── toolkits.ts
+├── toolkits.js
+├── tools.ts
+├── tools.js
+├── triggers.ts
+└── triggers.js
+```
+
+**Usage:**
+
+```typescript
+import { Toolkits, Tools, Triggers } from '@composio/core/generated';
+
+// Access toolkit metadata
+const githubToolkit = Toolkits.github;
+
+// Use tool enums
+const createRepoTool = Tools.GITHUB_CREATE_REPO;
+```
+
+### Python Projects
+
+When detected, runs:
+
+```bash
+composio py generate [OPTIONS]
+```
+
+**Generated files:**
+
+```
+composio_types/
+├── __init__.py
+├── toolkits.py
+├── tools.py
+└── triggers.py
+```
+
+**Usage:**
+
+```python
+from composio_types import Toolkits, Tools, Triggers
+
+# Access toolkit metadata
+github_toolkit = Toolkits.github
+
+# Use tool enums
+create_repo_tool = Tools.GITHUB_CREATE_REPO
+```
+
+## Auto-Detection Logic
+
+The CLI scans your current directory for project files:
+
+| File | Detected Language |
+|------|------------------|
+| `package.json` | TypeScript |
+| `tsconfig.json` | TypeScript |
+| `package-lock.json` | TypeScript |
+| `pnpm-lock.yaml` | TypeScript |
+| `yarn.lock` | TypeScript |
+| `bun.lockb` | TypeScript |
+| `pyproject.toml` | Python |
+| `requirements.txt` | Python |
+| `Pipfile` | Python |
+| `poetry.lock` | Python |
+
+<Note>
+  If both TypeScript and Python files are detected, TypeScript takes precedence.
+</Note>
+
+## Caching
+
+The CLI caches API responses for faster subsequent runs:
+
+**Cache location:** `~/.composio/`
+
+**Cached files:**
+- `toolkits.json` - Toolkit metadata
+- `tools.json` - Tool definitions
+- `tools-as-enums.json` - Tool name enums
+- `trigger-types.json` - Trigger type definitions
+
+**Force cache usage:**
+
+```bash
+FORCE_USE_CACHE=true composio generate
+```
+
+Uses cached data if available (works offline).
+
+## Toolkit Version Overrides
+
+You can pin specific toolkit versions using environment variables:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+export COMPOSIO_TOOLKIT_VERSION_GITHUB=latest
+composio generate --type-tools
+```
+
+<Note>
+  Toolkit version overrides only apply when using `--type-tools`. Without it, versions are ignored.
+</Note>
+
+See [Toolkit Versions](/cli/configuration/toolkit-versions) for more details.
+
+## Performance
+
+Generation speed depends on:
+
+- **--toolkits filter:** Faster (only fetches specified toolkits)
+- **--type-tools flag:** Slower (fetches full tool schemas)
+- **Cache availability:** Much faster (skips API calls)
+
+**Typical timing:**
+
+| Scenario | Time |
+|----------|------|
+| Full generation (no types) | ~5-10 seconds |
+| Full generation (with types) | ~30-60 seconds |
+| Filtered (3 toolkits, no types) | ~2-3 seconds |
+| Cached (offline) | Less than 1 second |
+
+## Troubleshooting
+
+### Project Type Not Detected
+
+If the CLI can't detect your project type:
+
+```
+Error: Could not detect project type.
+```
+
+**Solution:** Use language-specific commands:
+
+```bash
+composio ts generate  # For TypeScript
+composio py generate  # For Python
+```
+
+### Cannot Write to node_modules
+
+If you get permission errors:
+
+```
+Error: Cannot write to node_modules/@composio/core/generated
+```
+
+**Solution:** Specify a custom output directory:
+
+```bash
+composio generate --output-dir ./composio-types
+```
+
+### Invalid Toolkits
+
+If you specify invalid toolkit names:
+
+```
+Error: Invalid toolkit(s): invalid-toolkit. Toolkit not found.
+```
+
+**Solution:** Check available toolkits:
+
+```bash
+composio toolkits list
+```
+
+## Related Commands
+
+- `composio ts generate` - TypeScript-specific generation (auto-detected)
+- `composio py generate` - Python-specific generation (auto-detected)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Toolkit Versions" icon="tag" href="/cli/configuration/toolkit-versions">
+    Pin toolkit versions
+  </Card>
+  <Card title="Environment Variables" icon="gear" href="/cli/configuration/environment-variables">
+    Configure via environment
+  </Card>
+</CardGroup>

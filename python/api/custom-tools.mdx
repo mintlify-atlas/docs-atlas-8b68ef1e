@@ -1,0 +1,68 @@
+---
+title: Custom Tools
+description: Create your own tools with Python functions
+---
+
+Custom tools allow you to extend Composio with your own Python functions.
+
+## Basic Custom Tool
+
+```python
+from composio import Composio
+from pydantic import BaseModel
+
+composio = Composio()
+
+class GreetRequest(BaseModel):
+    name: str
+
+@composio.tools.custom_tool
+def greet(request: GreetRequest) -> dict:
+    """Greet a person by name."""
+    return {"message": f"Hello, {request.name}!"}
+
+# Use the tool
+result = greet(name="Alice")
+print(result)  # {"message": "Hello, Alice!"}
+```
+
+## Custom Tool with Toolkit
+
+```python
+class GitHubSearchRequest(BaseModel):
+    query: str
+
+@composio.tools.custom_tool(toolkit="github")
+def custom_github_search(
+    request: GitHubSearchRequest,
+    execute_request,
+    auth_credentials
+) -> dict:
+    """Search GitHub with custom logic."""
+    # Use execute_request to make API calls
+    response = execute_request(
+        endpoint=f"/search/repositories?q={request.query}",
+        method="GET"
+    )
+    return response
+```
+
+## Using Custom Tools with AI
+
+```python
+from openai import OpenAI
+
+openai_client = OpenAI()
+
+# Get tools including custom ones
+tools = composio.tools.get(
+    user_id="default",
+    tools=["GREET"]  # Custom tool slug
+)
+
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    tools=tools,
+    messages=[{"role": "user", "content": "Greet Alice"}]
+)
+```

@@ -1,0 +1,265 @@
+---
+title: Installation
+description: Install and configure the Composio TypeScript SDK
+---
+
+## Prerequisites
+
+- Node.js 18 or later
+- npm, yarn, pnpm, or bun package manager
+- A Composio API key (get one at [app.composio.dev](https://app.composio.dev))
+
+## Installation
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install @composio/core
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add @composio/core
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add @composio/core
+    ```
+  </Tab>
+  <Tab title="bun">
+    ```bash
+    bun add @composio/core
+    ```
+  </Tab>
+</Tabs>
+
+## Provider Packages
+
+If you're using a specific AI framework, install the corresponding provider:
+
+<Tabs>
+  <Tab title="OpenAI">
+    ```bash
+    npm install @composio/openai openai
+    ```
+  </Tab>
+  <Tab title="Anthropic">
+    ```bash
+    npm install @composio/anthropic @anthropic-ai/sdk
+    ```
+  </Tab>
+  <Tab title="LangChain">
+    ```bash
+    npm install @composio/langchain @langchain/core
+    ```
+  </Tab>
+  <Tab title="LlamaIndex">
+    ```bash
+    npm install @composio/llamaindex llamaindex
+    ```
+  </Tab>
+  <Tab title="Vercel AI">
+    ```bash
+    npm install @composio/vercel ai
+    ```
+  </Tab>
+  <Tab title="Google GenAI">
+    ```bash
+    npm install @composio/google @google/generative-ai
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file in your project root:
+
+```bash
+# Required
+COMPOSIO_API_KEY=your_api_key_here
+
+# Optional
+COMPOSIO_BASE_URL=https://backend.composio.dev  # Custom API endpoint
+COMPOSIO_LOG_LEVEL=info                         # silent, error, warn, info, debug
+COMPOSIO_DISABLE_TELEMETRY=false                # Disable usage analytics
+```
+
+### Initialize the SDK
+
+<Tabs>
+  <Tab title="Environment Variable">
+    ```typescript
+    import { Composio } from '@composio/core';
+
+    // Reads COMPOSIO_API_KEY from environment
+    const composio = new Composio();
+    ```
+  </Tab>
+  <Tab title="Direct Configuration">
+    ```typescript
+    import { Composio } from '@composio/core';
+
+    const composio = new Composio({
+      apiKey: 'your-api-key',
+      baseURL: 'https://backend.composio.dev',
+      allowTracking: false
+    });
+    ```
+  </Tab>
+  <Tab title="With Provider">
+    ```typescript
+    import { Composio } from '@composio/core';
+    import { AnthropicProvider } from '@composio/anthropic';
+
+    const composio = new Composio({
+      apiKey: 'your-api-key',
+      provider: new AnthropicProvider()
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Verification
+
+Verify your installation by listing available toolkits:
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio();
+
+// List all available toolkits
+const toolkits = await composio.toolkits.get({});
+console.log(`Available toolkits: ${toolkits.items.length}`);
+
+// Get tools from a specific toolkit
+const githubTools = await composio.tools.getRawComposioTools({
+  toolkits: ['github'],
+  limit: 5
+});
+console.log(`GitHub tools: ${githubTools.length}`);
+```
+
+## Platform Support
+
+The Composio SDK works in multiple JavaScript environments:
+
+### Node.js
+
+Full support for all features including file uploads and webhooks.
+
+```typescript
+import { Composio } from '@composio/core';
+```
+
+### Cloudflare Workers
+
+Lightweight runtime optimized for edge computing:
+
+```typescript
+import { Composio } from '@composio/cloudflare';
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const composio = new Composio({ apiKey: env.COMPOSIO_API_KEY });
+    
+    const tools = await composio.tools.get('default', 'GITHUB_GET_REPOS');
+    
+    // Ensure telemetry flushes before worker terminates
+    ctx.waitUntil(composio.flush());
+    
+    return new Response(JSON.stringify(tools));
+  }
+};
+```
+
+### Deno
+
+Import from npm specifiers:
+
+```typescript
+import { Composio } from 'npm:@composio/core';
+
+const composio = new Composio();
+```
+
+### Browser (Beta)
+
+Use with caution - API keys should not be exposed in browser environments:
+
+```typescript
+import { Composio } from '@composio/core';
+
+// Only for demo purposes - use a backend proxy in production
+const composio = new Composio({ apiKey: 'public-key' });
+```
+
+## Configuration Options
+
+All available configuration options:
+
+<ParamField path="apiKey" type="string">
+  Your Composio API key. Can also be set via `COMPOSIO_API_KEY` environment variable.
+</ParamField>
+
+<ParamField path="baseURL" type="string" default="https://backend.composio.dev">
+  Custom API endpoint. Useful for self-hosted deployments.
+</ParamField>
+
+<ParamField path="provider" type="Provider" default="OpenAIProvider">
+  The AI framework provider to use for tool formatting.
+</ParamField>
+
+<ParamField path="allowTracking" type="boolean" default={true}>
+  Enable anonymous usage analytics to help improve the SDK.
+</ParamField>
+
+<ParamField path="autoUploadDownloadFiles" type="boolean" default={true}>
+  Automatically handle file uploads and downloads during tool execution.
+</ParamField>
+
+<ParamField path="toolkitVersions" type="object">
+  Specify versions for toolkits. Omit to use latest.
+  
+  ```typescript
+  toolkitVersions: {
+    github: '20250909_00',
+    slack: '20250902_00'
+  }
+  ```
+</ParamField>
+
+<ParamField path="disableVersionCheck" type="boolean" default={false}>
+  Disable automatic SDK version checking.
+</ParamField>
+
+<ParamField path="defaultHeaders" type="object">
+  Custom headers to include in all API requests.
+  
+  ```typescript
+  defaultHeaders: {
+    'x-request-id': '12345',
+    'x-custom-header': 'value'
+  }
+  ```
+</ParamField>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Composio Class" icon="code" href="/typescript/api/composio">
+    Learn the main SDK class
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Work with tools
+  </Card>
+  <Card title="Providers" icon="plug" href="/typescript/providers/overview">
+    Choose your AI framework
+  </Card>
+  <Card title="Examples" icon="flask" href="https://github.com/ComposioHQ/sdk-v3-ts/tree/master/examples">
+    Browse examples
+  </Card>
+</CardGroup>

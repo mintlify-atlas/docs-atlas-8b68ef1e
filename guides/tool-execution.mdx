@@ -1,0 +1,357 @@
+---
+title: Tool Execution
+description: Learn how to execute tools in the Composio SDK with authentication, version control, and modifiers
+---
+
+## Overview
+
+Tool execution is the core operation in Composio, allowing you to run actions from integrated services. This guide covers executing tools manually, handling authentication, managing versions, and customizing behavior with modifiers.
+
+## Basic Tool Execution
+
+<Steps>
+
+### Step 1: Initialize Composio
+
+First, create a Composio instance with your API key:
+
+<CodeGroup>
+```typescript TypeScript
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+```
+
+```python Python
+from composio import Composio
+
+composio = Composio(api_key=os.environ["COMPOSIO_API_KEY"])
+```
+</CodeGroup>
+
+### Step 2: Execute a tool
+
+Execute a tool with the required parameters:
+
+<CodeGroup>
+```typescript TypeScript
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'default',
+  version: '20250909_00',
+  arguments: {
+    owner: 'composio'
+  }
+});
+
+if (result.successful) {
+  console.log('Repositories:', result.data);
+} else {
+  console.error('Error:', result.error);
+}
+```
+
+```python Python
+result = composio.tools.execute(
+    'GITHUB_GET_REPOS',
+    user_id='default',
+    version='20250909_00',
+    arguments={'owner': 'composio'}
+)
+
+if result.successful:
+    print('Repositories:', result.data)
+else:
+    print('Error:', result.error)
+```
+</CodeGroup>
+
+### Step 3: Handle the response
+
+The execution response contains:
+
+- `successful`: Boolean indicating success/failure
+- `data`: The result data (when successful)
+- `error`: Error details (when failed)
+- `logId`: Log identifier for debugging
+- `sessionInfo`: Session metadata (for stateful tools)
+
+</Steps>
+
+## Version Control
+
+<Warning>
+  By default, manual tool execution requires a specific toolkit version. If the version resolves to "latest", execution will throw a `ComposioToolVersionRequiredError` unless `dangerouslySkipVersionCheck` is set to `true`.
+</Warning>
+
+### Why Version Control Matters
+
+Using "latest" version in manual execution can lead to unexpected behavior when new toolkit versions are released, potentially breaking your application. For production use, it's recommended to pin specific toolkit versions.
+
+### Setting Versions
+
+There are multiple ways to control toolkit versions:
+
+<Tabs>
+  <Tab title="Execution Parameter">
+    ```typescript
+    // Pass version directly in execute call (highest priority)
+    const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'default',
+      version: '20250909_00',
+      arguments: { owner: 'composio' }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="SDK Configuration">
+    ```typescript
+    // Configure at SDK initialization
+    const composio = new Composio({
+      apiKey: process.env.COMPOSIO_API_KEY,
+      toolkitVersions: {
+        github: '20250909_00',
+        slack: '20250801_00'
+      }
+    });
+    
+    // Now all GitHub tools use version 20250909_00
+    await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'default',
+      arguments: { owner: 'composio' }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Environment Variable">
+    ```bash
+    # Set via environment variable
+    export COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00
+    ```
+    
+    ```typescript
+    // Automatically uses version from environment
+    await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'default',
+      arguments: { owner: 'composio' }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Skip Check (Not Recommended)">
+    ```typescript
+    // ⚠️ Not recommended for production
+    const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'default',
+      dangerouslySkipVersionCheck: true,
+      arguments: { owner: 'composio' }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Authenticated Tool Execution
+
+### Using Connected Accounts
+
+Most tools require authentication. Use a connected account to execute authenticated tools:
+
+```typescript
+// Execute with connected account ID
+const result = await composio.tools.execute('GITHUB_CREATE_ISSUE', {
+  userId: 'user123',
+  connectedAccountId: 'conn_abc123',
+  version: '20250909_00',
+  arguments: {
+    owner: 'myorg',
+    repo: 'myrepo',
+    title: 'Bug Report',
+    body: 'Description of the issue'
+  }
+});
+```
+
+If you don't specify `connectedAccountId`, Composio uses the first active connected account for the user and toolkit.
+
+### Custom Authentication
+
+For one-off requests, you can provide custom authentication parameters:
+
+```typescript
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'default',
+  version: '20250909_00',
+  customAuthParams: {
+    access_token: 'ghp_yourpersonalaccesstoken',
+    token_type: 'Bearer'
+  },
+  arguments: {
+    owner: 'composio'
+  }
+});
+```
+
+<Warning>
+  Custom authentication bypasses Composio's token refresh and security features. Use connected accounts for production applications.
+</Warning>
+
+## No-Auth Tools
+
+Some tools don't require authentication:
+
+```typescript
+// Execute HackerNews API (no authentication needed)
+const result = await composio.tools.execute('HACKERNEWS_GET_USER', {
+  userId: 'default',
+  version: '20250909_00',
+  arguments: {
+    userId: 'pg'
+  }
+});
+```
+
+## Execution with Modifiers
+
+Modifiers allow you to customize tool behavior before and after execution. See the [Modifiers Guide](/guides/modifiers) for detailed information.
+
+```typescript
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'default',
+  version: '20250909_00',
+  arguments: { owner: 'composio' }
+}, {
+  beforeExecute: async ({ toolSlug, params }) => {
+    console.log(`Executing ${toolSlug}`);
+    return params;
+  },
+  afterExecute: async ({ result }) => {
+    console.log(`Execution complete`);
+    return result;
+  }
+});
+```
+
+## Custom Tools Execution
+
+Custom tools you've created can be executed the same way:
+
+```typescript
+// Execute a custom tool
+const result = await composio.tools.execute('MY_CUSTOM_TOOL', {
+  userId: 'default',
+  arguments: {
+    query: 'search term',
+    limit: 10
+  }
+});
+```
+
+Custom tools with a toolkit slug automatically use the connected account for that toolkit. See [Custom Tools Guide](/guides/custom-tools) for more details.
+
+## Error Handling
+
+Properly handle execution errors:
+
+```typescript
+try {
+  const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+    userId: 'default',
+    version: '20250909_00',
+    arguments: { owner: 'composio' }
+  });
+  
+  if (!result.successful) {
+    // Handle tool-level errors
+    console.error('Tool execution failed:', result.error);
+    return;
+  }
+  
+  // Process successful result
+  console.log('Data:', result.data);
+  
+} catch (error) {
+  // Handle SDK-level errors
+  if (error instanceof ComposioToolNotFoundError) {
+    console.error('Tool not found:', error.message);
+  } else if (error instanceof ComposioConnectedAccountNotFoundError) {
+    console.error('No connected account:', error.message);
+  } else if (error instanceof ComposioToolVersionRequiredError) {
+    console.error('Version required:', error.message);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+See the [Error Handling Guide](/guides/error-handling) for comprehensive error management strategies.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Pin Versions" icon="lock">
+    Always specify toolkit versions for production applications to avoid breaking changes.
+  </Card>
+  
+  <Card title="Use Connected Accounts" icon="plug">
+    Prefer connected accounts over custom auth params for better security and token management.
+  </Card>
+  
+  <Card title="Handle Errors" icon="shield">
+    Check both `result.successful` and catch SDK exceptions for robust error handling.
+  </Card>
+  
+  <Card title="Enable Tracing" icon="chart-line">
+    Set `allowTracing: true` in execution params for debugging and monitoring.
+  </Card>
+</CardGroup>
+
+## Advanced Options
+
+### Execution Tracing
+
+Enable tracing to monitor tool execution:
+
+```typescript
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'default',
+  version: '20250909_00',
+  allowTracing: true,
+  arguments: { owner: 'composio' }
+});
+
+// Access trace data via logId
+console.log('Trace Log ID:', result.logId);
+```
+
+### Text-based Execution
+
+Some tools support natural language input:
+
+```typescript
+const result = await composio.tools.execute('GITHUB_CREATE_ISSUE', {
+  userId: 'default',
+  version: '20250909_00',
+  text: 'Create a bug report titled "Login fails" with description "Users cannot log in with OAuth"'
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication Flows" icon="key" href="/guides/authentication-flows">
+    Learn how to set up and manage user authentication
+  </Card>
+  
+  <Card title="Modifiers" icon="sliders" href="/guides/modifiers">
+    Customize tool behavior with before and after execution hooks
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Implement robust error handling strategies
+  </Card>
+  
+  <Card title="File Handling" icon="file" href="/guides/file-handling">
+    Work with file uploads and downloads in tools
+  </Card>
+</CardGroup>

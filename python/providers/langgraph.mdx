@@ -1,0 +1,23 @@
+---
+title: LangGraph Provider
+description: Use Composio tools with LangGraph
+---
+
+## Installation
+
+```bash
+pip install composio-langgraph langgraph
+```
+
+## Usage
+
+```python
+from composio_langgraph import LangGraphProvider
+from composio import Composio
+
+composio = Composio(provider=LangGraphProvider())
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with LangGraph
+# ...
+```

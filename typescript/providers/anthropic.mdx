@@ -1,0 +1,249 @@
+---
+title: Anthropic Provider  
+description: Use Composio tools with Claude and Anthropic's tool use API
+---
+
+The Anthropic provider wraps Composio tools in the format expected by Claude's tool use API.
+
+## Installation
+
+```bash
+npm install @composio/anthropic @anthropic-ai/sdk
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { AnthropicProvider } from '@composio/anthropic';
+import Anthropic from '@anthropic-ai/sdk';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new AnthropicProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const anthropic = new Anthropic({ apiKey: 'your-anthropic-key' });
+
+const message = await anthropic.messages.create({
+  model: 'claude-3-opus-20240229',
+  max_tokens: 1024,
+  tools,
+  messages: [
+    { role: 'user', content: 'Create a GitHub issue titled "Bug Report"' }
+  ]
+});
+
+// Handle tool use
+const provider = new AnthropicProvider();
+const toolResults = await provider.handleToolCalls('default', message);
+```
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { AnthropicProvider } from '@composio/anthropic';
+import Anthropic from '@anthropic-ai/sdk';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new AnthropicProvider()
+});
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!
+});
+
+async function runAgent(userMessage: string) {
+  const tools = await composio.tools.get('default', {
+    toolkits: ['github']
+  });
+
+  const messages: Anthropic.Messages.MessageParam[] = [
+    { role: 'user', content: userMessage }
+  ];
+
+  let response = await anthropic.messages.create({
+    model: 'claude-3-opus-20240229',
+    max_tokens: 4096,
+    tools,
+    messages
+  });
+
+  const provider = new AnthropicProvider();
+
+  while (response.stop_reason === 'tool_use') {
+    // Handle tool calls
+    const toolResults = await provider.handleToolCalls(
+      'default',
+      response
+    );
+
+    // Add tool results to conversation
+    messages.push(
+      { role: 'assistant', content: response.content },
+      ...toolResults
+    );
+
+    // Get next response
+    response = await anthropic.messages.create({
+      model: 'claude-3-opus-20240229',
+      max_tokens: 4096,
+      tools,
+      messages
+    });
+  }
+
+  // Extract final text response
+  const textContent = response.content.find(
+    block => block.type === 'text'
+  );
+  
+  return textContent?.type === 'text' ? textContent.text : '';
+}
+
+const result = await runAgent('Create an issue in my repo');
+console.log(result);
+```
+
+## Tool Caching
+
+Enable ephemeral caching to reduce costs:
+
+```typescript
+const composio = new Composio({
+  apiKey: 'your-key',
+  provider: new AnthropicProvider({
+    cacheTools: true // Enable prompt caching
+  })
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+// Tools will include cache_control markers
+const message = await anthropic.messages.create({
+  model: 'claude-3-opus-20240229',
+  max_tokens: 1024,
+  tools, // Tools are cached
+  messages: [{ role: 'user', content: 'Create an issue' }]
+});
+```
+
+## handleToolCalls()
+
+Automatically execute tool calls from Claude's response:
+
+```typescript
+const provider = new AnthropicProvider();
+
+const toolResults = await provider.handleToolCalls(
+  'user_123', // User ID
+  message, // Claude's response
+  { connectedAccountId: 'conn_abc123' }, // Options
+  { // Modifiers
+    beforeExecute: ({ toolSlug, params }) => {
+      console.log(`Executing ${toolSlug}`);
+      return params;
+    }
+  }
+);
+
+// Returns: Anthropic.Messages.MessageParam[]
+```
+
+## Tool Format
+
+The Anthropic provider wraps tools in this format:
+
+```typescript
+interface AnthropicTool {
+  name: string; // Tool slug
+  description: string; // Tool description
+  input_schema: JSONSchema; // Input parameters
+  cache_control?: { type: 'ephemeral' }; // Optional caching
+}
+```
+
+## Streaming
+
+```typescript
+const stream = await anthropic.messages.stream({
+  model: 'claude-3-opus-20240229',
+  max_tokens: 1024,
+  tools,
+  messages
+});
+
+for await (const event of stream) {
+  if (event.type === 'content_block_delta') {
+    if (event.delta.type === 'text_delta') {
+      process.stdout.write(event.delta.text);
+    }
+  }
+  
+  if (event.type === 'content_block_start') {
+    if (event.content_block.type === 'tool_use') {
+      console.log('Tool call:', event.content_block.name);
+    }
+  }
+}
+```
+
+## Best Practices
+
+1. **Tool Caching**: Enable caching for cost savings
+2. **Max Tokens**: Set appropriate max_tokens for tool responses
+3. **Error Handling**: Handle tool execution errors
+4. **Prompt Design**: Craft clear system prompts
+5. **Stop Reasons**: Check stop_reason for tool_use
+
+## TypeScript Types
+
+```typescript
+import type { Anthropic } from '@anthropic-ai/sdk';
+
+// Tool collection type
+type AnthropicToolCollection = AnthropicTool[];
+
+// Single tool type
+interface AnthropicTool {
+  name: string;
+  description: string;
+  input_schema: InputSchema;
+  cache_control?: { type: 'ephemeral' };
+}
+```
+
+## Differences from OpenAI
+
+| Feature | OpenAI | Anthropic |
+|---------|--------|----------|
+| Tool Format | Function | Tool Use |
+| Streaming | Delta format | Event stream |
+| Caching | No | Ephemeral caching |
+| Max Tokens | Optional | Required |
+| Tool Execution | Manual | Via handleToolCalls |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Provider" icon="brain" href="/typescript/providers/openai">
+    Compare with OpenAI
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up authentication
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View examples
+  </Card>
+</CardGroup>

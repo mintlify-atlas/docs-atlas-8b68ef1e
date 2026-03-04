@@ -1,0 +1,231 @@
+---
+title: composio login
+description: Authenticate with the Composio platform using browser OAuth or API key
+---
+
+The `composio login` command authenticates your CLI with the Composio platform.
+
+## Usage
+
+```bash
+composio login [OPTIONS]
+```
+
+## Authentication Modes
+
+### Browser-Based Login (Default)
+
+Opens your browser for OAuth authentication:
+
+```bash
+composio login
+```
+
+**Terminal output:**
+
+```
+┌  composio login
+│
+◇  Redirecting you to the login page
+│
+┌────────────────────────────────────────────────────────┐
+│ Login URL                                              │
+├────────────────────────────────────────────────────────┤
+│ https://platform.composio.dev?cliKey=session_abc123    │
+└────────────────────────────────────────────────────────┘
+│
+◆  Waiting for login...
+│
+◇  Logged in as user@example.com
+│
+└  You're all set!
+```
+
+The CLI:
+1. Creates a CLI session
+2. Opens your browser to the login URL
+3. Polls for authentication completion
+4. Stores your credentials in `~/.composio/user-config.json`
+
+### No-Browser Mode
+
+For headless environments or SSH sessions:
+
+```bash
+composio login --no-browser
+```
+
+Displays the login URL without opening a browser. Copy and paste the URL into a browser manually.
+
+### Non-Interactive Login
+
+For CI/CD, automation, or agent environments:
+
+```bash
+composio login --api-key <key> --org-id <org> --project-id <project>
+```
+
+All three flags are required together:
+- `--api-key` - Your user API key (starts with `uak_`)
+- `--org-id` - Organization ID
+- `--project-id` - Project nano ID (starts with `pr_`)
+
+<Note>
+  Non-interactive login validates credentials against the Composio API. If validation fails (400/401/403), the login will fail.
+</Note>
+
+## Options
+
+<ParamField path="--no-browser" type="boolean" default="false">
+  Login without browser interaction. Displays the login URL without opening it.
+</ParamField>
+
+<ParamField path="--api-key" type="string">
+  API key for non-interactive login (agents/CI). Must be used with `--org-id` and `--project-id`.
+</ParamField>
+
+<ParamField path="--org-id" type="string">
+  Organization ID for non-interactive login. Must be used with `--api-key` and `--project-id`.
+</ParamField>
+
+<ParamField path="--project-id" type="string">
+  Project ID for non-interactive login. Must be used with `--api-key` and `--org-id`.
+</ParamField>
+
+## Examples
+
+### Interactive Login
+
+```bash
+composio login
+```
+
+Opens browser, authenticates, and stores credentials.
+
+### Headless Login
+
+```bash
+composio login --no-browser
+```
+
+Displays URL for manual browser authentication.
+
+### CI/CD Login
+
+```bash
+composio login \
+  --api-key "$COMPOSIO_API_KEY" \
+  --org-id "$COMPOSIO_ORG_ID" \
+  --project-id "$COMPOSIO_PROJECT_ID"
+```
+
+Authenticates using environment variables (no browser required).
+
+### Scripted Login with JSON Output
+
+```bash
+# Capture structured output
+LOGIN_INFO=$(composio login --no-browser 2>/dev/null)
+echo "$LOGIN_INFO" | jq -r '.org_id'
+```
+
+The CLI outputs structured JSON to stdout for scripting:
+
+```json
+{
+  "email": "user@example.com",
+  "org_id": "k2OiqRLMdHyM",
+  "project_id": "pr_xlSR6oN5jIlk",
+  "org_name": "My Organization",
+  "project_name": "My Project"
+}
+```
+
+## Configuration Storage
+
+Credentials are stored in `~/.composio/user-config.json`:
+
+```json
+{
+  "api_key": "uak_...",
+  "base_url": "https://backend.composio.dev",
+  "web_url": "https://platform.composio.dev",
+  "org_id": "k2OiqRLMdHyM",
+  "project_id": "pr_xlSR6oN5jIlk"
+}
+```
+
+<Warning>
+  The `user-config.json` file contains your API key. Keep it secure and never commit it to version control.
+</Warning>
+
+## Session Scope
+
+The `login` command creates a **user-scoped** session, which provides global credentials for all projects.
+
+## Multi-Project Support
+
+The login flow enriches your credentials with organization and project metadata:
+
+1. **OAuth flow** completes and provides a user API key
+2. **Session info API** fetches org/project details
+3. **Credentials stored** for multi-tenant support
+
+## Troubleshooting
+
+### Already Logged In
+
+If you're already authenticated:
+
+```
+You're already logged in!
+```
+
+To log in with a different account, manually clear your credentials from `~/.composio/user-config.json` and run `composio login` again.
+
+### Browser Doesn't Open
+
+If the browser fails to open automatically:
+
+```
+Could not open the browser automatically.
+Tip: try using the `--no-browser` flag and open the URL manually.
+```
+
+Use `--no-browser` and copy the URL manually.
+
+### Login Timeout
+
+If authentication takes too long:
+
+```
+Login timed out. Please try again.
+```
+
+The CLI retries up to 15 times (about 75 seconds). If it times out, run `composio login` again.
+
+### Validation Errors (Non-Interactive)
+
+For non-interactive login with invalid credentials:
+
+```
+HTTP 401: Unauthorized
+```
+
+Verify your API key, org ID, and project ID are correct.
+
+## Related Commands
+
+- [`composio whoami`](/cli/commands/whoami) - Display your account information
+- [`composio generate`](/cli/commands/generate) - Generate type definitions for your project
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="whoami" icon="user" href="/cli/commands/whoami">
+    Check your logged-in account
+  </Card>
+  <Card title="generate" icon="code" href="/cli/commands/generate">
+    Generate type-safe code
+  </Card>
+</CardGroup>

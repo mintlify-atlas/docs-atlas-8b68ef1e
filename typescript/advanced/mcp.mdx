@@ -1,0 +1,300 @@
+---
+title: Model Context Protocol (MCP)
+description: Create and manage MCP servers for AI applications
+---
+
+<Note>
+  MCP support is experimental. Enable with `experimental.mcp` configuration.
+</Note>
+
+Model Context Protocol (MCP) servers provide a standardized way to expose tools to AI applications like Claude Desktop, Cursor, and other MCP-compatible clients.
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({
+  apiKey: 'your-key',
+  experimental: { mcp: true }
+});
+
+const server = await composio.mcp.create('my-server', {
+  toolkits: ['github', 'slack'],
+  allowedTools: ['GITHUB_CREATE_ISSUE', 'SLACK_SEND_MESSAGE']
+});
+
+console.log('MCP URL:', server.MCPUrl);
+```
+
+## Creating MCP Servers
+
+### create()
+
+```typescript
+async create(
+  name: string,
+  config: MCPConfigCreationParams
+): Promise<MCPConfigCreateResponse>
+```
+
+<ParamField path="name" type="string" required>
+  Unique name for the MCP server
+</ParamField>
+
+<ParamField path="config" type="MCPConfigCreationParams" required>
+  <Expandable title="properties">
+    <ParamField path="toolkits" type="string[] | ToolkitConfig[]" required>
+      Toolkits to include
+    </ParamField>
+    <ParamField path="allowedTools" type="string[]" optional>
+      Specific tools to enable
+    </ParamField>
+    <ParamField path="manuallyManageConnections" type="boolean" default={false}>
+      If true, users connect accounts manually; if false, uses chat-based authentication
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Tabs>
+  <Tab title="Basic Server">
+    ```typescript
+    const server = await composio.mcp.create('github-server', {
+      toolkits: ['github']
+    });
+    ```
+  </Tab>
+  <Tab title="With Specific Tools">
+    ```typescript
+    const server = await composio.mcp.create('limited-server', {
+      toolkits: ['github'],
+      allowedTools: [
+        'GITHUB_GET_REPOS',
+        'GITHUB_CREATE_ISSUE'
+      ]
+    });
+    ```
+  </Tab>
+  <Tab title="With Auth Config">
+    ```typescript
+    const server = await composio.mcp.create('custom-server', {
+      toolkits: [
+        { 
+          toolkit: 'github',
+          authConfigId: 'auth_config_123'
+        }
+      ]
+    });
+    ```
+  </Tab>
+  <Tab title="Manual Connections">
+    ```typescript
+    const server = await composio.mcp.create('manual-server', {
+      toolkits: ['github'],
+      manuallyManageConnections: true // Users connect via dashboard
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Managing MCP Servers
+
+### list()
+
+List all MCP servers:
+
+```typescript
+const servers = await composio.mcp.list({
+  page: 1,
+  limit: 10,
+  toolkits: ['github'],
+  name: 'github'
+});
+
+servers.items.forEach(server => {
+  console.log(server.id, server.name, server.MCPUrl);
+});
+```
+
+### get()
+
+Retrieve a specific server:
+
+```typescript
+const server = await composio.mcp.get('mcp_abc123');
+
+console.log('Name:', server.name);
+console.log('Tools:', server.allowedTools);
+console.log('Setup commands:', server.commands);
+```
+
+### update()
+
+Update server configuration:
+
+```typescript
+const updated = await composio.mcp.update('mcp_abc123', {
+  name: 'Updated Server Name',
+  toolkits: ['github', 'slack'],
+  allowedTools: ['GITHUB_CREATE_ISSUE', 'SLACK_SEND_MESSAGE']
+});
+```
+
+### delete()
+
+Delete an MCP server:
+
+```typescript
+await composio.mcp.delete('mcp_abc123');
+```
+
+## Generating User Instances
+
+### generate()
+
+Create a user-specific MCP server instance:
+
+```typescript
+const instance = await composio.mcp.generate(
+  'user_123',
+  'mcp_abc123',
+  { manuallyManageConnections: false }
+);
+
+console.log('User MCP URL:', instance.url);
+console.log('User ID:', instance.userId);
+```
+
+## Client Configuration
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "composio-github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch",
+        "https://mcp.composio.dev/mcp/abc123"
+      ],
+      "env": {
+        "x-api-key": "your-composio-api-key"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+Add to Cursor MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "composio": {
+      "url": "https://mcp.composio.dev/mcp/abc123",
+      "headers": {
+        "x-api-key": "your-composio-api-key"
+      }
+    }
+  }
+}
+```
+
+### Windsurf
+
+Use the setup command from `server.commands.windsurf`.
+
+## Server Response
+
+```typescript
+interface MCPConfigCreateResponse {
+  id: string; // Server ID
+  name: string; // Server name
+  MCPUrl: string; // MCP endpoint URL
+  allowedTools: string[]; // Enabled tools
+  authConfigIds: string[]; // Auth configs
+  commands: { // Client setup commands
+    claude: string;
+    cursor: string;
+    windsurf: string;
+  };
+  generate: (userId: string) => Promise<MCPServerInstance>; // Generate user instance
+}
+```
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  experimental: { mcp: true }
+});
+
+async function setupMCPServer() {
+  // Create MCP server
+  const server = await composio.mcp.create('github-server', {
+    toolkits: ['github'],
+    allowedTools: [
+      'GITHUB_GET_REPOS',
+      'GITHUB_CREATE_ISSUE',
+      'GITHUB_LIST_ISSUES'
+    ],
+    manuallyManageConnections: false // Chat-based auth
+  });
+
+  console.log('✅ MCP Server created');
+  console.log('ID:', server.id);
+  console.log('URL:', server.MCPUrl);
+  console.log('\nSetup commands:');
+  console.log('Claude:', server.commands.claude);
+  console.log('Cursor:', server.commands.cursor);
+
+  // Generate user instance
+  const instance = await server.generate('user_123');
+  console.log('\nUser instance:', instance.url);
+
+  return server;
+}
+
+const server = await setupMCPServer();
+```
+
+## Best Practices
+
+1. **Tool Selection**: Only include necessary tools
+2. **Naming**: Use descriptive server names
+3. **Auth Management**: Choose appropriate connection management
+4. **Documentation**: Document setup for your users
+5. **Updates**: Update servers when adding new tools
+
+## Limitations
+
+- MCP support is experimental
+- Requires MCP-compatible clients
+- Some features may not work in all environments
+- API may change in future versions
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool Router" icon="route" href="/typescript/advanced/tool-router">
+    Alternative approach
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Toolkits" icon="box" href="/typescript/api/toolkits">
+    Browse toolkits
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Manage connections
+  </Card>
+</CardGroup>

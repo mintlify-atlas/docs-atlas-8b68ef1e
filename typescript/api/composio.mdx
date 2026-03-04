@@ -1,0 +1,362 @@
+---
+title: Composio Class
+description: The main class for initializing and configuring the Composio SDK
+---
+
+The `Composio` class is the entry point for the TypeScript SDK. It initializes the API client and provides access to all core functionality.
+
+## Constructor
+
+```typescript
+const composio = new Composio<TProvider>(config?: ComposioConfig<TProvider>)
+```
+
+### Parameters
+
+<ParamField path="config" type="ComposioConfig<TProvider>" optional>
+  Configuration options for the SDK
+  
+  <Expandable title="properties">
+    <ParamField path="apiKey" type="string" optional>
+      Your Composio API key. Falls back to `COMPOSIO_API_KEY` environment variable.
+    </ParamField>
+    
+    <ParamField path="baseURL" type="string" optional default="https://backend.composio.dev">
+      The base URL for the Composio API.
+    </ParamField>
+    
+    <ParamField path="provider" type="TProvider" optional default="OpenAIProvider">
+      The AI framework provider for tool formatting.
+    </ParamField>
+    
+    <ParamField path="allowTracking" type="boolean" optional default={true}>
+      Enable anonymous usage analytics.
+    </ParamField>
+    
+    <ParamField path="autoUploadDownloadFiles" type="boolean" optional default={true}>
+      Automatically handle file uploads/downloads during tool execution.
+    </ParamField>
+    
+    <ParamField path="toolkitVersions" type="ToolkitVersionParam" optional>
+      Specify toolkit versions. Can be a global version string or object with per-toolkit versions.
+      
+      ```typescript
+      // Per-toolkit versions (recommended for production)
+      toolkitVersions: {
+        github: '20250909_00',
+        slack: '20250902_00'
+      }
+      
+      // Or set via environment: COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00
+      ```
+    </ParamField>
+    
+    <ParamField path="defaultHeaders" type="Record<string, string>" optional>
+      Custom headers included in all API requests.
+    </ParamField>
+    
+    <ParamField path="disableVersionCheck" type="boolean" optional default={false}>
+      Disable automatic SDK version checking.
+    </ParamField>
+    
+    <ParamField path="host" type="string" optional>
+      Host service name for telemetry (e.g., 'mcp', 'apollo').
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Examples
+
+<Tabs>
+  <Tab title="Default Configuration">
+    ```typescript
+    import { Composio } from '@composio/core';
+
+    // Uses COMPOSIO_API_KEY from environment
+    const composio = new Composio();
+    ```
+  </Tab>
+  
+  <Tab title="With API Key">
+    ```typescript
+    const composio = new Composio({
+      apiKey: 'your-api-key'
+    });
+    ```
+  </Tab>
+  
+  <Tab title="With Custom Provider">
+    ```typescript
+    import { AnthropicProvider } from '@composio/anthropic';
+
+    const composio = new Composio({
+      apiKey: 'your-api-key',
+      provider: new AnthropicProvider()
+    });
+    ```
+  </Tab>
+  
+  <Tab title="With Toolkit Versions">
+    ```typescript
+    const composio = new Composio({
+      apiKey: 'your-api-key',
+      toolkitVersions: {
+        github: '20250909_00',
+        slack: '20250902_00'
+      }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Full Configuration">
+    ```typescript
+    const composio = new Composio({
+      apiKey: 'your-api-key',
+      baseURL: 'https://api.composio.dev',
+      provider: new OpenAIProvider(),
+      allowTracking: false,
+      autoUploadDownloadFiles: true,
+      toolkitVersions: { github: '20250909_00' },
+      defaultHeaders: {
+        'x-request-id': 'custom-id'
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Properties
+
+The `Composio` instance provides access to core functionality through these properties:
+
+<ResponseField name="tools" type="Tools">
+  List, retrieve, and execute tools. See [Tools API](/typescript/api/tools).
+</ResponseField>
+
+<ResponseField name="toolkits" type="Toolkits">
+  Retrieve toolkit metadata and manage connections. See [Toolkits API](/typescript/api/toolkits).
+</ResponseField>
+
+<ResponseField name="connectedAccounts" type="ConnectedAccounts">
+  Manage user authentication. See [Connected Accounts API](/typescript/api/connected-accounts).
+</ResponseField>
+
+<ResponseField name="authConfigs" type="AuthConfigs">
+  Manage authentication configurations. See [Auth Configs API](/typescript/api/auth-configs).
+</ResponseField>
+
+<ResponseField name="triggers" type="Triggers">
+  Manage webhook triggers. See [Triggers API](/typescript/api/triggers).
+</ResponseField>
+
+<ResponseField name="provider" type="TProvider">
+  The configured provider instance for wrapping tools.
+</ResponseField>
+
+<ResponseField name="files" type="Files">
+  Upload and download files.
+</ResponseField>
+
+<ResponseField name="mcp" type="MCP">
+  Model Context Protocol server management. See [MCP](/typescript/advanced/mcp).
+</ResponseField>
+
+<ResponseField name="toolRouter" type="ToolRouter" experimental>
+  Experimental: Intelligent tool routing and connection management. See [Tool Router](/typescript/advanced/tool-router).
+</ResponseField>
+
+## Methods
+
+### create()
+
+Create a new tool router session for a user.
+
+```typescript
+async create(
+  userId: string,
+  config?: ToolRouterCreateSessionConfig
+): Promise<ToolRouterSession>
+```
+
+<ParamField path="userId" type="string" required>
+  The user ID to create the session for.
+</ParamField>
+
+<ParamField path="config" type="ToolRouterCreateSessionConfig" optional>
+  Configuration for the tool router session.
+</ParamField>
+
+**Example:**
+
+```typescript
+const session = await composio.create('user_123', {
+  toolkits: ['github', 'gmail'],
+  manageConnections: true
+});
+
+console.log(session.sessionId);
+console.log(session.mcp.url);
+
+const tools = await session.tools();
+```
+
+See [Tool Router](/typescript/advanced/tool-router) for more details.
+
+### use()
+
+Use an existing tool router session.
+
+```typescript
+async use(sessionId: string): Promise<ToolRouterSession>
+```
+
+<ParamField path="sessionId" type="string" required>
+  The ID of the session to use.
+</ParamField>
+
+**Example:**
+
+```typescript
+const session = await composio.use('session_abc123');
+const tools = await session.tools();
+```
+
+### getClient()
+
+Get the underlying Composio API client.
+
+```typescript
+getClient(): ComposioClient
+```
+
+**Example:**
+
+```typescript
+const client = composio.getClient();
+// Use client directly for low-level API access
+```
+
+### getConfig()
+
+Get the configuration used to initialize the SDK.
+
+```typescript
+getConfig(): ComposioConfig<TProvider>
+```
+
+**Example:**
+
+```typescript
+const config = composio.getConfig();
+console.log(config.apiKey); // [REDACTED]
+console.log(config.baseURL);
+```
+
+### createSession() <Badge variant="deprecated">Deprecated</Badge>
+
+Create a new instance with custom request options.
+
+```typescript
+createSession(options?: {
+  headers?: Record<string, string>
+}): Composio<TProvider>
+```
+
+<Warning>
+  This method will be removed in a future version. Use `defaultHeaders` in the constructor instead.
+</Warning>
+
+**Example:**
+
+```typescript
+const sessionComposio = composio.createSession({
+  headers: {
+    'x-request-id': '12345'
+  }
+});
+```
+
+### flush()
+
+Flush pending telemetry data. Required in environments like Cloudflare Workers that don't support process exit events.
+
+```typescript
+async flush(): Promise<void>
+```
+
+**Example:**
+
+```typescript
+// In a Cloudflare Worker
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const composio = new Composio({ apiKey: env.COMPOSIO_API_KEY });
+    
+    const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+      userId: 'default',
+      arguments: { owner: 'composio' }
+    });
+    
+    // Ensure telemetry flushes before worker terminates
+    ctx.waitUntil(composio.flush());
+    
+    return new Response(JSON.stringify(result));
+  }
+};
+```
+
+## Type Parameters
+
+The `Composio` class is generic and accepts a type parameter for the provider:
+
+```typescript
+import { Composio } from '@composio/core';
+import { AnthropicProvider } from '@composio/anthropic';
+
+// Fully typed with Anthropic provider
+const composio = new Composio<AnthropicProvider>({
+  provider: new AnthropicProvider()
+});
+
+// Tools will have Anthropic-specific types
+const tools = await composio.tools.get('default', { toolkits: ['github'] });
+// tools: Anthropic.Tool[]
+```
+
+## Environment Variables
+
+The SDK reads these environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `COMPOSIO_API_KEY` | Your Composio API key | - |
+| `COMPOSIO_BASE_URL` | Custom API endpoint | `https://backend.composio.dev` |
+| `COMPOSIO_LOG_LEVEL` | Logging level | `info` |
+| `COMPOSIO_DISABLE_TELEMETRY` | Disable telemetry | `false` |
+| `COMPOSIO_TOOLKIT_VERSION_<NAME>` | Version for specific toolkit | - |
+
+**Example:**
+
+```bash
+COMPOSIO_API_KEY=your_key
+COMPOSIO_LOG_LEVEL=debug
+COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00
+COMPOSIO_TOOLKIT_VERSION_SLACK=20250902_00
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Work with tools
+  </Card>
+  <Card title="Toolkits API" icon="box" href="/typescript/api/toolkits">
+    Manage toolkits
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    User authentication
+  </Card>
+  <Card title="Providers" icon="plug" href="/typescript/providers/overview">
+    Choose your framework
+  </Card>
+</CardGroup>

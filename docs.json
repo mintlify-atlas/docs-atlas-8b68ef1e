@@ -1,122 +1,226 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Composio",
+  "theme": "sequoia",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#8B5CF6",
+    "light": "#A78BFA",
+    "dark": "#7C3AED"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/composiohq/composio"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/composiohq/composio"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/tools",
+              "concepts/toolkits",
+              "concepts/connected-accounts",
+              "concepts/authentication",
+              "concepts/custom-tools",
+              "concepts/providers"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Installation",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "installation/typescript",
+              "installation/python",
+              "installation/cli"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Guides",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/tool-execution",
+              "guides/authentication-flows",
+              "guides/custom-tools",
+              "guides/modifiers",
+              "guides/file-handling",
+              "guides/error-handling",
+              "guides/environment-variables"
+            ]
+          },
+          {
+            "group": "MCP & Rube",
+            "pages": [
+              "mcp/overview",
+              "mcp/rube"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "TypeScript SDK",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "typescript/overview",
+              "typescript/installation"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Core API",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "typescript/api/composio",
+              "typescript/api/tools",
+              "typescript/api/toolkits",
+              "typescript/api/connected-accounts",
+              "typescript/api/auth-configs",
+              "typescript/api/triggers",
+              "typescript/api/custom-tools"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "typescript/providers/overview",
+              "typescript/providers/openai",
+              "typescript/providers/openai-agents",
+              "typescript/providers/anthropic",
+              "typescript/providers/langchain",
+              "typescript/providers/llamaindex",
+              "typescript/providers/vercel",
+              "typescript/providers/google",
+              "typescript/providers/mastra",
+              "typescript/providers/cloudflare",
+              "typescript/providers/custom"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "typescript/advanced/tool-router",
+              "typescript/advanced/mcp",
+              "typescript/advanced/files",
+              "typescript/advanced/platform-support"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Python SDK",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "python/overview",
+              "python/installation"
+            ]
+          },
+          {
+            "group": "Core API",
+            "pages": [
+              "python/api/composio",
+              "python/api/tools",
+              "python/api/toolkits",
+              "python/api/connected-accounts",
+              "python/api/auth-configs",
+              "python/api/triggers",
+              "python/api/custom-tools"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "python/providers/overview",
+              "python/providers/openai",
+              "python/providers/openai-agents",
+              "python/providers/anthropic",
+              "python/providers/langchain",
+              "python/providers/langgraph",
+              "python/providers/llamaindex",
+              "python/providers/crewai",
+              "python/providers/autogen",
+              "python/providers/gemini",
+              "python/providers/google",
+              "python/providers/google-adk"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "python/advanced/tool-router",
+              "python/advanced/mcp",
+              "python/advanced/decorators"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "cli/overview",
+              "cli/installation"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/commands/login",
+              "cli/commands/whoami",
+              "cli/commands/generate",
+              "cli/commands/upgrade",
+              "cli/commands/version"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "cli/configuration/environment-variables",
+              "cli/configuration/toolkit-versions"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "TypeScript Examples",
+            "pages": [
+              "examples/typescript/openai-basic",
+              "examples/typescript/anthropic-basic",
+              "examples/typescript/langchain",
+              "examples/typescript/custom-tools",
+              "examples/typescript/file-handling"
+            ]
+          },
+          {
+            "group": "Python Examples",
+            "pages": [
+              "examples/python/openai-basic",
+              "examples/python/langchain",
+              "examples/python/crewai",
+              "examples/python/custom-tools"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

@@ -1,0 +1,168 @@
+---
+title: OpenAI Basic Example
+description: Learn how to use Composio with OpenAI Chat Completions API to execute tools
+---
+
+This example demonstrates how to integrate Composio tools with OpenAI's Chat Completions API to fetch data from HackerNews.
+
+## Overview
+
+In this example, you'll learn how to:
+- Initialize Composio with OpenAI
+- Fetch and use tools from Composio
+- Handle tool calls from OpenAI responses
+- Execute tools and process results
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install @composio/core openai
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Create a `.env` file with your API keys:
+    ```bash
+    COMPOSIO_API_KEY=your_composio_api_key
+    OPENAI_API_KEY=your_openai_api_key
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAI } from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+/**
+ * Initialize Composio
+ * OpenAI Provider is automatically installed and initialized
+ */
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+});
+
+/**
+ * Get the tools
+ * This tool is automatically typed and wrapped with the OpenAI Provider
+ */
+const tools = await composio.tools.get('default', 'HACKERNEWS_GET_USER');
+
+/**
+ * Define a task for the assistant based on the tools in hand
+ */
+const task = "Fetch the details of the user 'haxzie'";
+
+/**
+ * Define the messages for the assistant
+ */
+const messages: OpenAI.ChatCompletionMessageParam[] = [
+  { role: 'system', content: 'You are a helpful assistant that can help with tasks.' },
+  { role: 'user', content: task },
+];
+
+/**
+ * Create a chat completion
+ */
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o-mini',
+  messages,
+  tools: tools,
+  tool_choice: 'auto',
+});
+
+/**
+ * If the assistant has tool calls, execute them and log the result
+ */
+if (
+  response.choices[0].message.tool_calls &&
+  response.choices[0].message.tool_calls[0].type === 'function'
+) {
+  console.log(JSON.stringify(response, null, 2));
+  const toolCall = response.choices[0].message.tool_calls[0];
+  if (toolCall.type === 'function') {
+    console.log(`✅ Calling tool ${response.choices[0].message.tool_calls[0].function.name}`);
+  }
+  const result = await composio.provider.handleToolCalls('default', response);
+  console.log(result);
+}
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Initialize OpenAI and Composio">
+    First, we create instances of both the OpenAI client and Composio SDK. Composio automatically detects and initializes the OpenAI provider.
+  </Step>
+
+  <Step title="Fetch Tools">
+    We fetch the `HACKERNEWS_GET_USER` tool from Composio. The tool is automatically formatted to work with OpenAI's function calling format.
+  </Step>
+
+  <Step title="Create Chat Completion">
+    We send a message to OpenAI along with the available tools. OpenAI decides whether to use the tool based on the user's request.
+  </Step>
+
+  <Step title="Handle Tool Calls">
+    If OpenAI decides to call a tool, we use Composio's `handleToolCalls` method to execute the tool and get the result.
+  </Step>
+</Steps>
+
+## Expected Output
+
+When you run this example, you'll see:
+
+```json
+{
+  "id": "chatcmpl-...",
+  "object": "chat.completion",
+  "created": 1234567890,
+  "model": "gpt-4o-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "id": "call_...",
+            "type": "function",
+            "function": {
+              "name": "HACKERNEWS_GET_USER",
+              "arguments": "{\"username\":\"haxzie\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ]
+}
+✅ Calling tool HACKERNEWS_GET_USER
+{
+  "data": {
+    "id": "haxzie",
+    "created": 1234567890,
+    "karma": 1234,
+    "about": "..."
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Anthropic Integration" icon="message-bot" href="/examples/typescript/anthropic-basic">
+    Learn how to use Composio with Anthropic Claude
+  </Card>
+  <Card title="Custom Tools" icon="wrench" href="/examples/typescript/custom-tools">
+    Create your own custom tools with Composio
+  </Card>
+</CardGroup>

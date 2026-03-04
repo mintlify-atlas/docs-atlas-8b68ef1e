@@ -1,0 +1,23 @@
+---
+title: AutoGen Provider
+description: Use Composio tools with Microsoft AutoGen
+---
+
+## Installation
+
+```bash
+pip install composio-autogen pyautogen
+```
+
+## Usage
+
+```python
+from composio_autogen import AutoGenProvider
+from composio import Composio
+
+composio = Composio(provider=AutoGenProvider())
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with AutoGen
+# ...
+```

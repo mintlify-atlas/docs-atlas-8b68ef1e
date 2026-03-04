@@ -1,0 +1,325 @@
+---
+title: Toolkit Versions
+description: Pin specific toolkit versions using environment variables
+---
+
+The Composio CLI supports pinning specific toolkit versions using environment variables. This allows you to control which version of each toolkit is used when generating type definitions.
+
+## Overview
+
+Toolkit versions determine the available tools and their schemas for each integration. By default, the CLI uses the `latest` version for all toolkits. You can override this behavior to:
+
+- **Pin specific versions** for reproducible builds
+- **Test against older versions** for compatibility
+- **Preview new features** in specific toolkit versions
+
+<Note>
+  Toolkit version overrides only apply when using the `--type-tools` flag with `composio generate` or `composio ts generate`.
+</Note>
+
+## Environment Variable Format
+
+To override a toolkit version, set an environment variable:
+
+```bash
+COMPOSIO_TOOLKIT_VERSION_<TOOLKIT_SLUG>=<version>
+```
+
+**Format:**
+- `<TOOLKIT_SLUG>` - Uppercase toolkit name (e.g., `GMAIL`, `GITHUB`, `SLACK`)
+- `<version>` - Version identifier or `latest`
+
+## Examples
+
+### Pin a Single Toolkit
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+composio generate --type-tools
+```
+
+Generates types using Gmail toolkit version `20250901_00` and `latest` for all others.
+
+### Pin Multiple Toolkits
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+export COMPOSIO_TOOLKIT_VERSION_GITHUB=20241215_00
+export COMPOSIO_TOOLKIT_VERSION_SLACK=20250115_00
+composio generate --type-tools --toolkits gmail --toolkits github --toolkits slack
+```
+
+### Use Latest Version Explicitly
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=latest
+composio generate --type-tools --toolkits gmail
+```
+
+Explicitly uses the latest version (same as not setting the variable).
+
+### Mixed Versions
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00    # Specific version
+export COMPOSIO_TOOLKIT_VERSION_GITHUB=latest        # Latest version
+composio generate --type-tools
+```
+
+## Version Discovery
+
+To find available versions for a toolkit:
+
+```bash
+composio toolkits version <toolkit-slug>
+```
+
+**Example:**
+
+```bash
+composio toolkits version gmail
+```
+
+**Output:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Gmail Toolkit Versions                              │
+├─────────────────────────────────────────────────────┤
+│ - 20250901_00 (latest)                              │
+│ - 20250815_00                                       │
+│ - 20250701_00                                       │
+│ - 20250615_00                                       │
+└─────────────────────────────────────────────────────┘
+```
+
+## Validation
+
+The CLI validates toolkit version overrides before fetching data:
+
+1. **Detects overrides** from environment variables
+2. **Logs detected versions** for transparency
+3. **Validates against API** to ensure versions exist
+4. **Warns about unused overrides** when using `--toolkits` filter
+
+**Example output:**
+
+```
+◇  Toolkit version overrides detected:
+│  - gmail: 20250901_00
+│  - github: 20241215_00
+│
+◇  Validating toolkit versions...
+│
+◆  Warning: Toolkit version override for 'slack' is not used (not in --toolkits filter)
+```
+
+## Behavior with --type-tools
+
+### With --type-tools (Versions Apply)
+
+When using `--type-tools`, the CLI fetches full tool schemas with version support:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+composio generate --type-tools --toolkits gmail
+```
+
+**What happens:**
+1. Fetches Gmail toolkit version `20250901_00`
+2. Generates full type definitions for tools in that version
+3. Includes input/output schemas
+
+### Without --type-tools (Versions Ignored)
+
+Without `--type-tools`, the CLI only fetches tool names (not full schemas), so versions don't apply:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+composio generate --toolkits gmail
+# Version override is ignored
+```
+
+**What happens:**
+1. Fetches Gmail toolkit metadata (no version)
+2. Generates tool name enums only (e.g., `GMAIL_SEND_EMAIL`)
+3. No input/output schemas
+
+<Warning>
+  Toolkit version overrides are only meaningful when using `--type-tools`. Without it, all toolkits use the latest version implicitly.
+</Warning>
+
+## Version Map Output
+
+When version overrides are applied, the generated code includes a version map:
+
+**TypeScript output:**
+
+```typescript
+export const ToolkitVersions = {
+  gmail: "20250901_00",
+  github: "20241215_00",
+} as const;
+```
+
+This allows you to track which versions were used during generation.
+
+## Use Cases
+
+### Reproducible Builds
+
+Pin toolkit versions in CI/CD for consistent builds:
+
+```bash
+# .env.production
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+export COMPOSIO_TOOLKIT_VERSION_GITHUB=20241215_00
+export COMPOSIO_TOOLKIT_VERSION_SLACK=20250115_00
+
+# CI script
+source .env.production
+composio generate --type-tools
+```
+
+### Testing Against Older Versions
+
+Test compatibility with a previous toolkit version:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250701_00
+composio generate --type-tools --toolkits gmail
+npm test
+```
+
+### Preview New Features
+
+Test new toolkit features before they're widely available:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=latest
+composio generate --type-tools --toolkits gmail
+```
+
+### Version Lock File
+
+Create a version lock file for your project:
+
+```bash
+# toolkit-versions.env
+COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+COMPOSIO_TOOLKIT_VERSION_GITHUB=20241215_00
+COMPOSIO_TOOLKIT_VERSION_SLACK=20250115_00
+COMPOSIO_TOOLKIT_VERSION_NOTION=20250120_00
+```
+
+Load it before generation:
+
+```bash
+source toolkit-versions.env
+composio generate --type-tools
+```
+
+## Filtering and Versions
+
+When using `--toolkits` to filter generation, the CLI warns about unused version overrides:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+export COMPOSIO_TOOLKIT_VERSION_SLACK=20250115_00
+composio generate --type-tools --toolkits gmail
+```
+
+**Output:**
+
+```
+◇  Toolkit version overrides detected:
+│  - gmail: 20250901_00
+│  - slack: 20250115_00
+│
+◆  Warning: Toolkit version override for 'slack' is not used (not in --toolkits filter)
+│
+◇  Fetching data for 1 toolkit(s): gmail...
+```
+
+The `slack` override is ignored because `slack` is not in the `--toolkits` filter.
+
+## Version Naming Convention
+
+Composio toolkit versions follow the format:
+
+```
+YYYYMMDD_NN
+```
+
+- `YYYYMMDD` - Release date (e.g., `20250901` = September 1, 2025)
+- `NN` - Revision number (e.g., `00`, `01`)
+
+**Examples:**
+- `20250901_00` - First release on September 1, 2025
+- `20250901_01` - Second release on September 1, 2025
+- `latest` - Most recent version
+
+## Troubleshooting
+
+### Invalid Version
+
+If you specify a non-existent version:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20990101_00
+composio generate --type-tools --toolkits gmail
+```
+
+**Error:**
+
+```
+Error: Toolkit version '20990101_00' not found for toolkit 'gmail'.
+Available versions: 20250901_00, 20250815_00, 20250701_00
+```
+
+**Solution:** Use `composio toolkits version gmail` to list available versions.
+
+### Version Override Ignored
+
+If your version override doesn't apply:
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+composio generate --toolkits gmail
+# No error, but version is not used
+```
+
+**Reason:** `--type-tools` flag is missing.
+
+**Solution:** Add `--type-tools`:
+
+```bash
+composio generate --type-tools --toolkits gmail
+```
+
+### Case Sensitivity
+
+Environment variable names are case-sensitive:
+
+```bash
+# Wrong (lowercase)
+export composio_toolkit_version_gmail=20250901_00
+
+# Correct (uppercase)
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+```
+
+## Related Commands
+
+- [`composio generate`](/cli/commands/generate) - Generate types with version control
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="gear" href="/cli/configuration/environment-variables">
+    Configure the CLI
+  </Card>
+  <Card title="Generate Command" icon="code" href="/cli/commands/generate">
+    Generate type-safe code
+  </Card>
+</CardGroup>

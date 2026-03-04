@@ -1,0 +1,191 @@
+---
+title: LlamaIndex Provider
+description: Use Composio tools with LlamaIndex.TS agents and workflows
+---
+
+The LlamaIndex provider wraps Composio tools for use with LlamaIndex.TS.
+
+## Installation
+
+```bash
+npm install @composio/llamaindex llamaindex
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { LlamaindexProvider } from '@composio/llamaindex';
+import { OpenAI, OpenAIAgent } from 'llamaindex';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new LlamaindexProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const llm = new OpenAI({ model: 'gpt-4', apiKey: 'your-openai-key' });
+
+const agent = new OpenAIAgent({ llm, tools });
+
+const response = await agent.chat({ message: 'Create a GitHub issue' });
+console.log(response.response);
+```
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { LlamaindexProvider } from '@composio/llamaindex';
+import { OpenAI, OpenAIAgent, Settings } from 'llamaindex';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new LlamaindexProvider()
+});
+
+async function runAgent(userMessage: string) {
+  const tools = await composio.tools.get('default', {
+    toolkits: ['github']
+  });
+
+  const llm = new OpenAI({
+    model: 'gpt-4',
+    apiKey: process.env.OPENAI_API_KEY!
+  });
+
+  Settings.llm = llm;
+
+  const agent = new OpenAIAgent({
+    llm,
+    tools,
+    verbose: true
+  });
+
+  const response = await agent.chat({ message: userMessage });
+  return response.response;
+}
+
+const answer = await runAgent('Create a GitHub issue titled "Bug Report"');
+console.log(answer);
+```
+
+## With Chat History
+
+```typescript
+import { ChatMemoryBuffer } from 'llamaindex';
+
+const memory = new ChatMemoryBuffer({ tokenLimit: 4096 });
+
+const agent = new OpenAIAgent({
+  llm,
+  tools,
+  chatHistory: memory
+});
+
+const response1 = await agent.chat({ message: 'My name is Alice' });
+const response2 = await agent.chat({ message: 'What is my name?' });
+
+console.log(response2.response); // Uses chat history
+```
+
+## Streaming
+
+```typescript
+const agent = new OpenAIAgent({ llm, tools });
+
+const stream = await agent.chat({
+  message: 'Create an issue',
+  stream: true
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.delta);
+}
+```
+
+## With RAG
+
+```typescript
+import { VectorStoreIndex, SimpleDirectoryReader } from 'llamaindex';
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+// Load documents
+const documents = await new SimpleDirectoryReader().loadData('./docs');
+
+// Create index
+const index = await VectorStoreIndex.fromDocuments(documents);
+
+// Create query engine as tool
+const queryEngine = index.asQueryEngine();
+
+const agent = new OpenAIAgent({
+  llm,
+  tools: [
+    ...tools,
+    queryEngine.asTool({
+      name: 'search_docs',
+      description: 'Search documentation'
+    })
+  ]
+});
+```
+
+## Tool Format
+
+```typescript
+import { tool as createLlamaindexTool } from 'llamaindex';
+
+// Tools are wrapped using LlamaIndex's tool() function
+const tool = createLlamaindexTool({
+  name: 'GITHUB_CREATE_ISSUE',
+  description: 'Create a new GitHub issue',
+  parameters: zodSchema,
+  execute: async (input) => {
+    return JSON.stringify(result);
+  }
+});
+```
+
+## Best Practices
+
+1. **Settings**: Configure global Settings for LlamaIndex
+2. **Verbose Mode**: Enable for debugging
+3. **Memory**: Use ChatMemoryBuffer for conversations
+4. **RAG Integration**: Combine tools with retrieval
+5. **Error Handling**: Wrap agent calls properly
+
+## TypeScript Types
+
+```typescript
+import type { tool } from 'llamaindex';
+
+// Tool type
+type LlamaindexTool = ReturnType<typeof tool>;
+
+// Tool collection
+type LlamaindexToolCollection = LlamaindexTool[];
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="LangChain Provider" icon="link" href="/typescript/providers/langchain">
+    Alternative agent framework
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up authentication
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View examples
+  </Card>
+</CardGroup>

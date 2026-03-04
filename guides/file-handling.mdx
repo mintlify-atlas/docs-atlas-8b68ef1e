@@ -1,0 +1,533 @@
+---
+title: File Handling
+description: Work with file uploads and downloads in Composio tools
+---
+
+## Overview
+
+Composio provides automatic file handling capabilities for tools that work with files. The SDK can automatically upload files before tool execution and download files from tool responses, making file operations seamless and transparent.
+
+## Automatic File Handling
+
+### Enabling Auto Upload/Download
+
+File handling is enabled by default in Composio. You can control this behavior during SDK initialization:
+
+```typescript
+import { Composio } from 'composio-core';
+
+// Auto file handling is enabled by default
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  autoUploadDownloadFiles: true // Default
+});
+
+// Disable auto file handling
+const composioNoFiles = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  autoUploadDownloadFiles: false
+});
+```
+
+### How It Works
+
+When `autoUploadDownloadFiles` is enabled:
+
+1. **Before Execution**: Files in tool parameters are automatically uploaded to Composio's S3 storage
+2. **During Execution**: S3 URLs are passed to the tool instead of file content
+3. **After Execution**: Files in the response are automatically downloaded and converted to appropriate formats
+
+## Uploading Files
+
+### Manual File Upload
+
+You can manually upload files using the Files API:
+
+```typescript
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+
+// Upload a file from a local path
+const fileData = await composio.files.upload({
+  file: '/path/to/document.pdf',
+  toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+  toolkitSlug: 'google_drive'
+});
+
+console.log('File uploaded:', {
+  url: fileData.url,
+  mimeType: fileData.mimeType,
+  size: fileData.size
+});
+```
+
+### Upload from URL
+
+```typescript
+// Upload a file from a URL
+const fileData = await composio.files.upload({
+  file: 'https://example.com/document.pdf',
+  toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+  toolkitSlug: 'google_drive'
+});
+```
+
+### Upload File Object (Browser)
+
+```typescript
+// In a browser environment with a File object
+const handleFileUpload = async (file: File) => {
+  const fileData = await composio.files.upload({
+    file: file, // File object from input element
+    toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+    toolkitSlug: 'google_drive'
+  });
+  
+  console.log('Uploaded:', fileData.url);
+};
+```
+
+### Using Uploaded Files in Tools
+
+After uploading, use the file URL in tool execution:
+
+```typescript
+// Upload the file
+const fileData = await composio.files.upload({
+  file: '/path/to/report.pdf',
+  toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+  toolkitSlug: 'google_drive'
+});
+
+// Execute tool with uploaded file
+const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: {
+    file_url: fileData.url,
+    file_name: 'report.pdf',
+    folder_id: 'folder_xyz'
+  }
+});
+```
+
+## Downloading Files
+
+### Manual File Download
+
+Download files from S3 URLs in tool responses:
+
+```typescript
+// Execute a tool that returns file URLs
+const result = await composio.tools.execute('GOOGLE_DRIVE_DOWNLOAD', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: {
+    file_id: 'file_abc123'
+  }
+});
+
+if (result.successful && result.data.file_url) {
+  // Download the file
+  const fileData = await composio.files.download({
+    s3Url: result.data.file_url,
+    toolSlug: 'GOOGLE_DRIVE_DOWNLOAD',
+    mimeType: 'application/pdf'
+  });
+  
+  console.log('Downloaded file:', {
+    content: fileData.content,
+    mimeType: fileData.mimeType,
+    size: fileData.content.length
+  });
+}
+```
+
+### Save Downloaded Files
+
+```typescript
+import { writeFile } from 'fs/promises';
+
+const fileData = await composio.files.download({
+  s3Url: result.data.file_url,
+  toolSlug: 'GOOGLE_DRIVE_DOWNLOAD',
+  mimeType: 'application/pdf'
+});
+
+// Save to local filesystem
+await writeFile('/path/to/save/document.pdf', fileData.content);
+```
+
+## Automatic File Handling with Tools
+
+When `autoUploadDownloadFiles` is enabled, files are handled automatically:
+
+### Example: Uploading a File to Google Drive
+
+```typescript
+// With auto file handling enabled
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  autoUploadDownloadFiles: true // Default
+});
+
+// The SDK automatically uploads the file before execution
+const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: {
+    file: '/path/to/local/document.pdf', // Local file path
+    file_name: 'document.pdf',
+    folder_id: 'folder_xyz'
+  }
+});
+
+if (result.successful) {
+  console.log('File uploaded to Google Drive:', result.data);
+}
+```
+
+### Example: Downloading a File from Google Drive
+
+```typescript
+// The SDK automatically downloads files from the response
+const result = await composio.tools.execute('GOOGLE_DRIVE_DOWNLOAD', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: {
+    file_id: 'file_abc123'
+  }
+});
+
+if (result.successful) {
+  // File content is automatically downloaded and available
+  const fileContent = result.data.file_content; // File content as buffer
+  const fileName = result.data.file_name;
+  const mimeType = result.data.mime_type;
+  
+  // Save to disk
+  await writeFile(`/downloads/${fileName}`, fileContent);
+}
+```
+
+## File Tool Modifier
+
+The automatic file handling is implemented using the FileToolModifier internally. This modifier:
+
+1. **Before Execution**: Scans tool parameters for file paths or File objects and uploads them to S3
+2. **After Execution**: Scans response data for S3 URLs and downloads the files
+
+### How It Works Internally
+
+```typescript
+// Internally, when autoUploadDownloadFiles is true:
+// 1. Schema is modified to identify file parameters
+const fileToolModifier = new FileToolModifier(client);
+const modifiedSchema = await fileToolModifier.modifyToolSchema(
+  toolSlug,
+  toolkitSlug,
+  originalSchema
+);
+
+// 2. Before execution: files are uploaded
+const modifiedParams = await fileToolModifier.fileUploadModifier(
+  tool,
+  { toolSlug, toolkitSlug, params }
+);
+
+// 3. After execution: files are downloaded
+const modifiedResult = await fileToolModifier.fileDownloadModifier(
+  tool,
+  { toolSlug, toolkitSlug, result }
+);
+```
+
+## Supported File Types
+
+Composio supports various file types:
+
+- **Documents**: PDF, DOCX, TXT, MD, etc.
+- **Images**: PNG, JPG, JPEG, GIF, SVG, etc.
+- **Spreadsheets**: XLSX, CSV, etc.
+- **Archives**: ZIP, TAR, GZ, etc.
+- **Code**: JS, TS, PY, etc.
+- **Media**: MP3, MP4, etc.
+
+## File Size Limits
+
+<Warning>
+  - Maximum file size for upload: Check with your Composio plan
+  - Large files may take longer to upload/download
+  - Consider implementing progress tracking for large files
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Enable Auto Handling" icon="magic">
+    Use `autoUploadDownloadFiles: true` for seamless file operations in most cases.
+  </Card>
+  
+  <Card title="Validate File Types" icon="shield-check">
+    Validate file types and sizes before uploading to prevent errors.
+  </Card>
+  
+  <Card title="Handle Errors" icon="triangle-exclamation">
+    Implement proper error handling for file upload/download failures.
+  </Card>
+  
+  <Card title="Clean Up Files" icon="trash">
+    Delete temporary files after use to free up storage.
+  </Card>
+</CardGroup>
+
+## Working with Different File Sources
+
+### Local Files (Node.js)
+
+```typescript
+import { readFile } from 'fs/promises';
+
+// Upload from local filesystem
+const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: {
+    file: '/path/to/document.pdf',
+    file_name: 'document.pdf'
+  }
+});
+```
+
+### Remote URLs
+
+```typescript
+// Upload from a URL
+const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: {
+    file: 'https://example.com/document.pdf',
+    file_name: 'document.pdf'
+  }
+});
+```
+
+### Base64 Encoded Files
+
+```typescript
+// Convert base64 to file and upload
+const base64Data = 'data:application/pdf;base64,JVBERi0xLjQKJ...';
+const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
+
+// Save temporarily and upload
+import { writeFile, unlink } from 'fs/promises';
+const tempPath = '/tmp/temp-file.pdf';
+await writeFile(tempPath, buffer);
+
+const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+  userId: 'user_123',
+  version: '20250909_00',
+  arguments: {
+    file: tempPath,
+    file_name: 'document.pdf'
+  }
+});
+
+// Clean up
+await unlink(tempPath);
+```
+
+### Browser File Input
+
+```typescript
+// In browser with file input
+const handleFileInput = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  
+  if (!file) return;
+  
+  // Upload file object directly
+  const fileData = await composio.files.upload({
+    file: file,
+    toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+    toolkitSlug: 'google_drive'
+  });
+  
+  // Use in tool execution
+  const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+    userId: 'user_123',
+    version: '20250909_00',
+    arguments: {
+      file_url: fileData.url,
+      file_name: file.name
+    }
+  });
+};
+```
+
+## Error Handling
+
+```typescript
+import {
+  ComposioFileUploadError,
+  ComposioFileDownloadError
+} from 'composio-core';
+
+try {
+  const fileData = await composio.files.upload({
+    file: '/path/to/large-file.pdf',
+    toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+    toolkitSlug: 'google_drive'
+  });
+  
+  const result = await composio.tools.execute('GOOGLE_DRIVE_UPLOAD', {
+    userId: 'user_123',
+    version: '20250909_00',
+    arguments: {
+      file_url: fileData.url,
+      file_name: 'large-file.pdf'
+    }
+  });
+  
+} catch (error) {
+  if (error instanceof ComposioFileUploadError) {
+    console.error('File upload failed:', error.message);
+    // Handle upload errors (file too large, invalid format, etc.)
+  } else if (error instanceof ComposioFileDownloadError) {
+    console.error('File download failed:', error.message);
+    // Handle download errors
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+## Advanced: Custom File Processing
+
+If you need custom file processing, disable auto handling and use modifiers:
+
+```typescript
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  autoUploadDownloadFiles: false // Disable auto handling
+});
+
+const result = await composio.tools.execute(
+  'GOOGLE_DRIVE_UPLOAD',
+  {
+    userId: 'user_123',
+    version: '20250909_00',
+    arguments: {
+      file: '/path/to/document.pdf'
+    }
+  },
+  {
+    beforeExecute: async ({ params }) => {
+      // Custom file processing before upload
+      const fileContent = await readFile(params.arguments.file);
+      const processedContent = await compressFile(fileContent);
+      
+      // Upload processed file
+      const fileData = await composio.files.upload({
+        file: processedContent,
+        toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+        toolkitSlug: 'google_drive'
+      });
+      
+      return {
+        ...params,
+        arguments: {
+          ...params.arguments,
+          file_url: fileData.url
+        }
+      };
+    },
+    
+    afterExecute: async ({ result }) => {
+      // Custom processing after download
+      if (result.successful && result.data.file_url) {
+        const fileData = await composio.files.download({
+          s3Url: result.data.file_url,
+          toolSlug: 'GOOGLE_DRIVE_UPLOAD',
+          mimeType: 'application/pdf'
+        });
+        
+        // Process downloaded file
+        const processedContent = await extractTextFromPDF(fileData.content);
+        
+        return {
+          ...result,
+          data: {
+            ...result.data,
+            extractedText: processedContent
+          }
+        };
+      }
+      
+      return result;
+    }
+  }
+);
+```
+
+## Platform-Specific Considerations
+
+### Node.js
+
+```typescript
+import { readFile, writeFile } from 'fs/promises';
+import { createReadStream } from 'fs';
+
+// Reading files
+const content = await readFile('/path/to/file.pdf');
+
+// Writing files
+await writeFile('/path/to/output.pdf', fileData.content);
+```
+
+### Browser
+
+```typescript
+// Reading from File input
+const file = document.getElementById('fileInput').files[0];
+
+// Creating download link
+const blob = new Blob([fileData.content], { type: fileData.mimeType });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'downloaded-file.pdf';
+a.click();
+URL.revokeObjectURL(url);
+```
+
+### Cloudflare Workers
+
+<Warning>
+  File system access is not available in Cloudflare Workers. Use manual file upload with File objects or URLs instead.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool Execution" icon="play" href="/guides/tool-execution">
+    Execute tools that work with files
+  </Card>
+  
+  <Card title="Modifiers" icon="sliders" href="/guides/modifiers">
+    Customize file handling with modifiers
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Handle file-related errors
+  </Card>
+  
+  <Card title="Custom Tools" icon="wrench" href="/guides/custom-tools">
+    Create custom tools that work with files
+  </Card>
+</CardGroup>

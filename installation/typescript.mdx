@@ -1,0 +1,181 @@
+---
+title: TypeScript SDK Installation
+description: Install and set up the Composio TypeScript SDK in your project
+---
+
+## Installation
+
+Install the Composio TypeScript SDK using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install @composio/core
+```
+
+```bash yarn
+yarn add @composio/core
+```
+
+```bash pnpm
+pnpm add @composio/core
+```
+
+</CodeGroup>
+
+## Requirements
+
+- **Node.js**: Version 16 or higher
+- **TypeScript**: Version 4.5 or higher (optional, but recommended)
+
+## Environment Setup
+
+<Steps>
+
+<Step title="Get your API key">
+  Sign up at [composio.dev](https://composio.dev) and obtain your API key from the dashboard.
+</Step>
+
+<Step title="Configure environment variables">
+  Create a `.env` file in your project root and add your API key:
+
+  ```bash
+  COMPOSIO_API_KEY=your-api-key-here
+  COMPOSIO_BASE_URL=https://backend.composio.dev/api  # Optional: Custom API base URL
+  COMPOSIO_LOG_LEVEL=info                              # Optional: silent, error, warn, info, debug
+  COMPOSIO_DISABLE_TELEMETRY=false                     # Optional: Set to "true" to disable telemetry
+  ```
+</Step>
+
+<Step title="Initialize the SDK">
+  Import and initialize the Composio SDK in your application:
+
+  ```typescript
+  import { Composio } from '@composio/core';
+
+  const composio = new Composio({
+    apiKey: process.env.COMPOSIO_API_KEY,
+  });
+  ```
+</Step>
+
+</Steps>
+
+## Verification
+
+Verify your installation by running a simple test:
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+});
+
+// Test the connection
+async function verify() {
+  try {
+    const userId = 'test-user';
+    const tools = await composio.tools.get(userId, {
+      toolkits: ['HACKERNEWS'],
+    });
+    console.log(`Successfully connected! Found ${tools.length} tools.`);
+  } catch (error) {
+    console.error('Connection failed:', error);
+  }
+}
+
+verify();
+```
+
+## Provider-Specific Packages
+
+Depending on your AI framework, you may want to install a provider-specific package:
+
+<CodeGroup>
+
+```bash OpenAI
+npm install @composio/openai
+```
+
+```bash OpenAI Agents
+npm install @composio/openai-agents
+```
+
+```bash Anthropic
+npm install @composio/anthropic
+```
+
+```bash LangChain
+npm install @composio/langchain
+```
+
+```bash LlamaIndex
+npm install @composio/llamaindex
+```
+
+```bash Vercel AI SDK
+npm install @composio/vercel
+```
+
+```bash Google Gemini
+npm install @composio/google
+```
+
+```bash Mastra
+npm install @composio/mastra
+```
+
+```bash Cloudflare Workers AI
+npm install @composio/cloudflare
+```
+
+</CodeGroup>
+
+## Quick Start Example
+
+Here's a complete example using OpenAI Agents:
+
+<Steps>
+
+<Step title="Install dependencies">
+  ```bash
+  npm install @composio/openai-agents @openai/agents
+  ```
+</Step>
+
+<Step title="Create your agent">
+  ```typescript
+  import { Composio } from '@composio/core';
+  import { OpenAIAgentsProvider } from '@composio/openai-agents';
+  import { Agent, run } from '@openai/agents';
+
+  const composio = new Composio({
+    provider: new OpenAIAgentsProvider(),
+  });
+
+  const userId = 'user@acme.org';
+
+  const tools = await composio.tools.get(userId, {
+    toolkits: ['HACKERNEWS'],
+  });
+
+  const agent = new Agent({
+    name: 'Hackernews assistant',
+    tools: tools,
+  });
+
+  const result = await run(agent, 'What is the latest hackernews post about?');
+
+  console.log(JSON.stringify(result.finalOutput, null, 2));
+  ```
+</Step>
+
+</Steps>
+
+## Next Steps
+
+- Learn about [authentication](/guides/authentication) for connecting external services
+- Explore [available tools](/tools/overview) and toolkits
+- Build your first [AI agent](/guides/quickstart)
+- Check out [TypeScript examples](https://github.com/ComposioHQ/composio/tree/next/ts/examples)

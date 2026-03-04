@@ -1,0 +1,111 @@
+---
+title: TypeScript SDK Overview
+description: Build AI agents that can use 200+ tools and integrate with your favorite frameworks
+---
+
+The Composio TypeScript SDK enables you to integrate third-party tools into your AI applications with minimal setup. Connect your agents to services like GitHub, Gmail, Slack, and hundreds more.
+
+## Key Features
+
+- **200+ Tools**: Pre-built integrations with popular services
+- **Framework Agnostic**: Works with OpenAI, Anthropic, LangChain, LlamaIndex, Vercel AI SDK, and more
+- **Type Safety**: Full TypeScript support with autocomplete and type checking
+- **Authentication Management**: Handle OAuth, API keys, and custom auth seamlessly
+- **Custom Tools**: Create your own tools with custom logic
+- **Tool Router**: Intelligent connection and tool management
+- **MCP Support**: Model Context Protocol for standardized agent communication
+
+## Quick Start
+
+Install the SDK and start using tools in minutes:
+
+```bash
+npm install @composio/core
+```
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAI } from 'openai';
+
+const composio = new Composio({ apiKey: 'your-api-key' });
+const openai = new OpenAI({ apiKey: 'your-openai-key' });
+
+// Get tools for GitHub
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+// Use with OpenAI
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: 'Create a GitHub issue' }],
+  tools
+});
+```
+
+## Core Concepts
+
+### Tools
+
+Individual actions like `GITHUB_CREATE_ISSUE`, `GMAIL_SEND_EMAIL`, or `SLACK_SEND_MESSAGE`. Each tool has:
+- Input parameters with validation
+- Output schema
+- Authentication requirements
+- Version control
+
+### Toolkits
+
+Collections of related tools grouped by service (e.g., `github`, `gmail`, `slack`). Toolkits help you:
+- Get all tools for a service at once
+- Manage authentication per service
+- Filter tools by capability
+
+### Connected Accounts
+
+Authenticated connections to external services for specific users. They store:
+- User credentials (OAuth tokens, API keys)
+- Connection status
+- Refresh tokens and expiration
+
+### Auth Configs
+
+Authentication configurations that define how to connect to services:
+- OAuth apps (client ID, secret, scopes)
+- API key requirements
+- Custom authentication flows
+
+## Architecture
+
+```
+Your Application
+       |
+   Composio SDK
+       |
+   ├── Tools      (List, execute, create custom tools)
+   ├── Toolkits   (Manage toolkit metadata)
+   ├── Provider   (OpenAI, Anthropic, etc.)
+   ├── Connected  (User authentication)
+   |   Accounts
+   └── Triggers   (Webhook events)
+       |
+  Composio API
+       |
+  External Services (GitHub, Gmail, etc.)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/typescript/installation">
+    Install and configure the SDK
+  </Card>
+  <Card title="Core API" icon="code" href="/typescript/api/composio">
+    Learn the main SDK APIs
+  </Card>
+  <Card title="Providers" icon="plug" href="/typescript/providers/overview">
+    Integrate with AI frameworks
+  </Card>
+  <Card title="Examples" icon="flask" href="https://github.com/ComposioHQ/sdk-v3-ts/tree/master/examples">
+    Browse code examples
+  </Card>
+</CardGroup>

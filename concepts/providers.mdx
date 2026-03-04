@@ -1,0 +1,433 @@
+---
+title: Providers
+description: Learn about providers and how they integrate Composio with AI frameworks
+---
+
+# Providers
+
+Providers are the bridge between Composio's tool ecosystem and AI frameworks. They transform Composio tools into framework-specific formats and handle execution, enabling seamless integration with OpenAI, Anthropic, LangChain, and other AI platforms.
+
+## Overview
+
+The base provider classes define the contract for all Composio provider implementations. Providers come in two types: **agentic** and **non-agentic**, each serving different use cases.
+
+**Source:** `ts/packages/core/src/provider/BaseProvider.ts`
+
+## Provider Types
+
+### Agentic Providers
+
+Agentic providers are designed for AI frameworks that need to execute tools autonomously. They wrap tools with execution functions that the AI can call directly.
+
+**Examples:** OpenAI, Anthropic, LangChain, Google AI, Vercel AI
+
+```typescript
+import { OpenAIProvider } from '@composio/openai';
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ 
+  apiKey: 'your-api-key',
+  provider: new OpenAIProvider({ apiKey: 'openai-key' })
+});
+
+// Tools are wrapped with execution capabilities
+const tools = await composio.tools.get('user_123', {
+  toolkits: ['github']
+});
+
+// AI can execute these tools directly
+const openai = new OpenAI();
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: 'Create a GitHub issue' }],
+  tools: tools // Includes execution logic
+});
+```
+
+### Non-Agentic Providers
+
+Non-agentic providers are for frameworks that only need tool schemas without execution logic. The framework receives tool definitions, and you handle execution separately.
+
+**Examples:** Raw JSON schema providers, documentation generators
+
+```typescript
+import { BaseNonAgenticProvider } from '@composio/core';
+
+class SchemaProvider extends BaseNonAgenticProvider {
+  readonly name = 'schema';
+  
+  wrapTool(tool) {
+    return {
+      name: tool.slug,
+      schema: tool.inputParameters
+    };
+  }
+  
+  wrapTools(tools) {
+    return tools.map(tool => this.wrapTool(tool));
+  }
+}
+```
+
+## Provider Architecture
+
+### Base Provider Class
+
+All providers extend from `BaseProvider` and implement specific methods:
+
+```typescript
+abstract class BaseProvider {
+  // Provider identification
+  abstract readonly name: string;
+  
+  // Provider type (set automatically)
+  abstract readonly _isAgentic: boolean;
+  
+  // Global tool execution (injected by SDK)
+  executeTool(toolSlug, body, modifiers): Promise<ToolExecuteResponse>;
+}
+```
+
+### Agentic Provider Contract
+
+```typescript
+abstract class BaseAgenticProvider extends BaseProvider {
+  override readonly _isAgentic = true;
+  
+  // Wrap a single tool with execution function
+  abstract wrapTool(tool: Tool, executeTool: ExecuteToolFn): TTool;
+  
+  // Wrap multiple tools with execution function
+  abstract wrapTools(tools: Tool[], executeTool: ExecuteToolFn): TToolCollection;
+}
+```
+
+### Non-Agentic Provider Contract
+
+```typescript
+abstract class BaseNonAgenticProvider extends BaseProvider {
+  override readonly _isAgentic = false;
+  
+  // Wrap a single tool (schema only)
+  abstract wrapTool(tool: Tool): TTool;
+  
+  // Wrap multiple tools (schemas only)
+  abstract wrapTools(tools: Tool[]): TToolCollection;
+}
+```
+
+## Using Providers
+
+### Initialize Composio with a Provider
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAIProvider } from '@composio/openai';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new OpenAIProvider({ apiKey: 'your-openai-key' })
+});
+```
+
+<Info>
+The provider must be specified when initializing Composio if you plan to use the `tools.get()` method. Without a provider, you'll receive a `ComposioProviderNotDefinedError`.
+</Info>
+
+### Getting Provider-Wrapped Tools
+
+```typescript
+// Get tools wrapped in provider-specific format
+const tools = await composio.tools.get('user_123', {
+  toolkits: ['github', 'slack']
+});
+
+// Tools are now in OpenAI function calling format
+console.log(tools[0].type); // 'function'
+console.log(tools[0].function.name); // 'GITHUB_CREATE_ISSUE'
+```
+
+### Using Raw Tools with Manual Provider
+
+```typescript
+// Get raw Composio tools
+const rawTools = await composio.tools.getRawComposioTools({
+  toolkits: ['github']
+});
+
+// Manually wrap with provider
+const provider = new OpenAIProvider({ apiKey: 'key' });
+const wrappedTools = provider.wrapTools(rawTools, executeToolFn);
+```
+
+## Execute Tool Function
+
+Agentic providers receive an `executeTool` function for each tool:
+
+```typescript
+type ExecuteToolFn = (
+  toolSlug: string,
+  input: Record<string, unknown>
+) => Promise<ToolExecuteResponse>;
+```
+
+### How It Works
+
+1. Provider wraps tools with the execute function
+2. AI framework calls the tool
+3. Execute function calls Composio's tool execution API
+4. Results are returned to the AI framework
+
+```typescript
+// Inside a provider implementation
+wrapTool(tool: Tool, executeTool: ExecuteToolFn) {
+  return {
+    type: 'function',
+    function: {
+      name: tool.slug,
+      description: tool.description,
+      parameters: tool.inputParameters,
+      execute: async (args) => {
+        // executeTool handles all Composio logic
+        const result = await executeTool(tool.slug, args);
+        return result.data;
+      }
+    }
+  };
+}
+```
+
+## Global Execute Tool Method
+
+Providers can execute any tool using the global `executeTool` method:
+
+```typescript
+class MyProvider extends BaseAgenticProvider {
+  async someHelperMethod(toolSlug: string, args: Record<string, unknown>) {
+    // Execute any Composio tool from within the provider
+    const result = await this.executeTool(
+      toolSlug,
+      {
+        userId: 'user_123',
+        arguments: args
+      },
+      {
+        beforeExecute: ({ toolSlug, params }) => {
+          console.log(`Executing ${toolSlug}`);
+          return params;
+        }
+      }
+    );
+    
+    return result;
+  }
+}
+```
+
+<Note>
+The `executeTool` method is injected by the Composio SDK and provides the same functionality as `composio.tools.execute()`. It automatically skips version checks for provider-controlled execution.
+</Note>
+
+## Creating Custom Providers
+
+### Custom Agentic Provider
+
+```typescript
+import { BaseAgenticProvider } from '@composio/core';
+import type { Tool, ExecuteToolFn } from '@composio/core';
+
+interface MyFrameworkTool {
+  id: string;
+  spec: object;
+  handler: (args: any) => Promise<any>;
+}
+
+class MyFrameworkProvider extends BaseAgenticProvider<
+  MyFrameworkTool[], // Tool collection type
+  MyFrameworkTool,   // Single tool type
+  any                // MCP response type (optional)
+> {
+  readonly name = 'my-framework';
+  
+  wrapTool(tool: Tool, executeTool: ExecuteToolFn): MyFrameworkTool {
+    return {
+      id: tool.slug,
+      spec: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputParameters
+      },
+      handler: async (args) => {
+        const result = await executeTool(tool.slug, args);
+        if (!result.successful) {
+          throw new Error(result.error);
+        }
+        return result.data;
+      }
+    };
+  }
+  
+  wrapTools(tools: Tool[], executeTool: ExecuteToolFn): MyFrameworkTool[] {
+    return tools.map(tool => this.wrapTool(tool, executeTool));
+  }
+}
+
+// Use the custom provider
+const composio = new Composio({
+  apiKey: 'your-key',
+  provider: new MyFrameworkProvider()
+});
+```
+
+### Custom Non-Agentic Provider
+
+```typescript
+import { BaseNonAgenticProvider } from '@composio/core';
+import type { Tool } from '@composio/core';
+
+interface ToolSchema {
+  name: string;
+  description: string;
+  inputSchema: object;
+}
+
+class SchemaOnlyProvider extends BaseNonAgenticProvider<
+  ToolSchema[], // Tool collection type
+  ToolSchema    // Single tool type
+> {
+  readonly name = 'schema-only';
+  
+  wrapTool(tool: Tool): ToolSchema {
+    return {
+      name: tool.slug,
+      description: tool.description,
+      inputSchema: tool.inputParameters
+    };
+  }
+  
+  wrapTools(tools: Tool[]): ToolSchema[] {
+    return tools.map(tool => this.wrapTool(tool));
+  }
+}
+```
+
+## Provider Options and Modifiers
+
+Providers support execution modifiers for customizing behavior:
+
+```typescript
+const tools = await composio.tools.get(
+  'user_123',
+  { toolkits: ['github'] },
+  {
+    modifySchema: ({ toolSlug, schema }) => {
+      // Transform tool schema before wrapping
+      return {
+        ...schema,
+        description: `Enhanced: ${schema.description}`
+      };
+    },
+    beforeExecute: ({ toolSlug, params }) => {
+      console.log(`Before: ${toolSlug}`);
+      return params;
+    },
+    afterExecute: ({ toolSlug, result }) => {
+      console.log(`After: ${toolSlug}`);
+      return result;
+    }
+  }
+);
+```
+
+## Available Providers
+
+Composio provides official providers for popular AI frameworks:
+
+- **@composio/openai** - OpenAI function calling
+- **@composio/anthropic** - Anthropic Claude tools
+- **@composio/google** - Google Gemini function calling
+- **@composio/langchain** - LangChain tools
+- **@composio/vercel** - Vercel AI SDK
+- **@composio/mastra** - Mastra framework
+
+### Example: Using Multiple Providers
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAIProvider } from '@composio/openai';
+import { AnthropicProvider } from '@composio/anthropic';
+
+// Create separate instances for different providers
+const openaiComposio = new Composio({
+  apiKey: 'composio-key',
+  provider: new OpenAIProvider({ apiKey: 'openai-key' })
+});
+
+const anthropicComposio = new Composio({
+  apiKey: 'composio-key',
+  provider: new AnthropicProvider({ apiKey: 'anthropic-key' })
+});
+
+// Get tools in different formats
+const openaiTools = await openaiComposio.tools.get('user', { toolkits: ['github'] });
+const anthropicTools = await anthropicComposio.tools.get('user', { toolkits: ['github'] });
+```
+
+## Version Control in Providers
+
+<Info>
+Providers automatically skip version checks during execution because they typically fetch tools right before use, ensuring they have the latest version.
+</Info>
+
+For manual version control:
+
+```typescript
+const composio = new Composio({
+  apiKey: 'your-key',
+  provider: new OpenAIProvider({ apiKey: 'openai-key' }),
+  toolkitVersions: {
+    github: '20250909_00',
+    slack: '20250815_00'
+  }
+});
+```
+
+## Error Handling
+
+Common provider-related errors:
+
+- `ComposioProviderNotDefinedError` - No provider specified when using `tools.get()`
+- `ComposioGlobalExecuteToolFnNotSetError` - Execute function not properly injected
+- Framework-specific errors from tool execution
+
+```typescript
+import { ComposioProviderNotDefinedError } from '@composio/core';
+
+try {
+  const tools = await composio.tools.get('user_123', { toolkits: ['github'] });
+} catch (error) {
+  if (error instanceof ComposioProviderNotDefinedError) {
+    console.error('No provider configured');
+    console.log('Initialize Composio with a provider:');
+    console.log('new Composio({ provider: new OpenAIProvider() })');
+  }
+}
+```
+
+## Best Practices
+
+1. **Provider Selection**: Choose agentic providers for autonomous AI agents, non-agentic for manual control
+2. **Reuse Instances**: Create one Composio instance per provider type and reuse it
+3. **Version Pinning**: Pin toolkit versions in production for stability
+4. **Error Handling**: Implement proper error handling for tool execution failures
+5. **Modifiers**: Use modifiers for logging, metrics, and transformation
+
+## Related Resources
+
+- [Tools](/concepts/tools) - Understanding tool execution
+- [Custom Tools](/concepts/custom-tools) - Creating custom tools that work with providers
+- [Connected Accounts](/concepts/connected-accounts) - Managing user authentication for tools
+- Provider Documentation:
+  - [OpenAI Provider](https://docs.composio.dev/providers/openai)
+  - [Anthropic Provider](https://docs.composio.dev/providers/anthropic)
+  - [LangChain Provider](https://docs.composio.dev/providers/langchain)

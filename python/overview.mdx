@@ -1,0 +1,133 @@
+---
+title: Python SDK Overview
+description: Complete guide to the Composio Python SDK for building AI agents with tool integration
+---
+
+The Composio Python SDK provides a powerful and flexible way to integrate tools with AI frameworks. It offers comprehensive support for tool execution, authentication management, and provider integrations.
+
+## Key Features
+
+- **Tools**: Manage and execute 200+ tools across various services
+- **Toolkits**: Organize tools by service (GitHub, Gmail, Slack, etc.)
+- **Triggers**: Create event-driven workflows with webhooks and real-time subscriptions
+- **Connected Accounts**: Manage OAuth and API key authentication for third-party services
+- **Auth Configs**: Configure authentication providers and settings
+- **Provider Integrations**: Native support for OpenAI, Anthropic, LangChain, CrewAI, and more
+- **Custom Tools**: Build your own tools with Python functions
+- **Tool Router**: Intelligent tool routing with session management
+- **MCP Support**: Model Context Protocol integration for Claude and Cursor
+
+## Installation
+
+See the [Installation Guide](/python/installation) for detailed instructions.
+
+## Quick Start
+
+```python
+import os
+from composio import Composio
+from openai import OpenAI
+
+# Initialize clients
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+composio = Composio(api_key=os.getenv("COMPOSIO_API_KEY"))
+
+# Get tools
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with OpenAI
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Star the composiohq/composio repository"}
+    ],
+    tools=tools
+)
+
+# Execute tool calls
+if response.choices[0].message.tool_calls:
+    result = composio.provider.handle_tool_calls(
+        response=response,
+        user_id="default"
+    )
+    print(result)
+```
+
+## Core Concepts
+
+### Generic Type System
+
+The Composio SDK uses Python generics to provide type safety across different AI providers:
+
+```python
+from composio import Composio
+from composio_openai import OpenAIProvider
+from composio_anthropic import AnthropicProvider
+
+# Types automatically inferred from provider
+composio_openai = Composio(provider=OpenAIProvider())
+# Type: Composio[OpenAITool, list[OpenAITool]]
+
+composio_anthropic = Composio(provider=AnthropicProvider())
+# Type: Composio[ToolParam, list[ToolParam]]
+```
+
+### User ID Pattern
+
+Most operations require a `user_id` to manage user-specific connections:
+
+```python
+# Use your own user identification system
+tools = composio.tools.get(user_id="user_12345", toolkits=["github"])
+
+# Or use "default" for single-user applications
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+```
+
+## Architecture
+
+The SDK is organized into these main components:
+
+- **[Composio Client](/python/api/composio)**: Main entry point with configuration
+- **[Tools](/python/api/tools)**: Tool retrieval and execution
+- **[Toolkits](/python/api/toolkits)**: Toolkit management and authorization
+- **[Connected Accounts](/python/api/connected-accounts)**: Authentication management
+- **[Auth Configs](/python/api/auth-configs)**: Auth configuration
+- **[Triggers](/python/api/triggers)**: Event subscriptions and webhooks
+- **[Custom Tools](/python/api/custom-tools)**: Create custom tools
+- **[Tool Router](/python/advanced/tool-router)**: Advanced routing
+- **[MCP](/python/advanced/mcp)**: Model Context Protocol
+
+## Provider Integrations
+
+Composio supports multiple AI frameworks with dedicated packages:
+
+- [OpenAI](/python/providers/openai) - `composio-openai`
+- [OpenAI Agents](/python/providers/openai-agents) - OpenAI Agents SDK
+- [Anthropic](/python/providers/anthropic) - `composio-anthropic`
+- [LangChain](/python/providers/langchain) - `composio-langchain`
+- [LangGraph](/python/providers/langgraph) - `composio-langgraph`
+- [LlamaIndex](/python/providers/llamaindex) - `composio-llamaindex`
+- [CrewAI](/python/providers/crewai) - `composio-crewai`
+- [AutoGen](/python/providers/autogen) - `composio-autogen`
+- [Google AI](/python/providers/google) - `composio-google`
+- [Google ADK](/python/providers/google-adk) - `composio-google-adk`
+- [Gemini](/python/providers/gemini) - `composio-gemini`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/python/installation">
+    Install the Python SDK and provider packages
+  </Card>
+  <Card title="Composio Client" icon="code" href="/python/api/composio">
+    Learn about the main SDK client and configuration
+  </Card>
+  <Card title="Tools" icon="wrench" href="/python/api/tools">
+    Work with tools and execute actions
+  </Card>
+  <Card title="Providers" icon="plug" href="/python/providers/overview">
+    Integrate with AI frameworks
+  </Card>
+</CardGroup>

@@ -1,0 +1,234 @@
+---
+title: Python OpenAI Example
+description: Use Composio with OpenAI Agents in Python to create powerful AI assistants
+---
+
+This example demonstrates how to use Composio with OpenAI Agents framework in Python to create AI agents that can execute tools via MCP (Model Context Protocol).
+
+## Overview
+
+In this example, you'll learn how to:
+- Create a Composio session with MCP server
+- Integrate Composio with OpenAI Agents
+- Use MCP for tool execution
+- Build agents that can access external APIs
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    pip install composio openai-agents
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Create a `.env` file with your API keys:
+    ```bash
+    COMPOSIO_API_KEY=your_composio_api_key
+    OPENAI_API_KEY=your_openai_api_key
+    ```
+  </Step>
+
+  <Step title="Authenticate with Gmail">
+    ```bash
+    composio add gmail
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```python
+from agents import Agent, HostedMCPTool, Runner
+from composio import Composio
+
+# Initialize Composio and create a session
+composio = Composio()
+session = composio.create(
+    user_id="user_123",
+)
+
+print(session.mcp)
+
+# Create MCP tool with Composio session
+composio_mcp = HostedMCPTool(
+    tool_config={
+        "type": "mcp",
+        "server_label": "tool_router",
+        "server_url": session.mcp.url,
+        "require_approval": "never",
+        "headers": session.mcp.headers,
+    }
+)
+
+# Create an agent with Composio tools
+agent = Agent(
+    name="My Agent",
+    instructions="You are a helpful assistant that can use the tools provided to you.",
+    tools=[composio_mcp],
+)
+
+# Run the agent
+result = Runner.run_sync(
+    starting_agent=agent,
+    input="Find my last email and summarize it.",
+)
+
+print(result.final_output)
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Create Composio Session">
+    Initialize Composio and create a session for a specific user. This session provides an MCP server URL that the agent can connect to.
+    
+    ```python
+    composio = Composio()
+    session = composio.create(user_id="user_123")
+    ```
+  </Step>
+
+  <Step title="Configure MCP Tool">
+    Create a `HostedMCPTool` that connects to Composio's MCP server. This tool gives the agent access to all Composio tools.
+    
+    ```python
+    composio_mcp = HostedMCPTool(
+        tool_config={
+            "type": "mcp",
+            "server_url": session.mcp.url,
+            "headers": session.mcp.headers,
+        }
+    )
+    ```
+  </Step>
+
+  <Step title="Create Agent">
+    Instantiate an OpenAI Agent with instructions and the MCP tool.
+  </Step>
+
+  <Step title="Run Agent">
+    Use `Runner.run_sync()` to execute the agent with your input. The agent will automatically use the appropriate Composio tools to complete the task.
+  </Step>
+</Steps>
+
+## What is MCP?
+
+<Info>
+  **Model Context Protocol (MCP)** is an open standard for connecting AI models to external tools and data sources. Composio provides an MCP server that exposes all your connected tools through a standardized interface.
+</Info>
+
+## Session Configuration
+
+The `session.mcp` object contains:
+
+<ResponseField name="url" type="string">
+  The MCP server URL for this session
+</ResponseField>
+
+<ResponseField name="headers" type="dict">
+  Authentication headers for the MCP server
+</ResponseField>
+
+## Expected Output
+
+```bash
+MCPSession(
+  url='https://mcp.composio.dev/v1/session/abc123',
+  headers={'Authorization': 'Bearer ...'}
+)
+
+Summarizing your last email:
+
+From: john@example.com
+Subject: Project Update
+Received: 2 hours ago
+
+Summary: John provided an update on the Q1 project timeline...
+```
+
+## Multi-User Support
+
+Each user gets their own session with isolated credentials:
+
+```python
+# Create sessions for different users
+user1_session = composio.create(user_id="alice@company.com")
+user2_session = composio.create(user_id="bob@company.com")
+
+# Each session has different connected accounts
+agent1 = Agent(
+    name="Alice's Assistant",
+    tools=[HostedMCPTool(tool_config={
+        "server_url": user1_session.mcp.url,
+        "headers": user1_session.mcp.headers,
+    })],
+)
+
+agent2 = Agent(
+    name="Bob's Assistant",
+    tools=[HostedMCPTool(tool_config={
+        "server_url": user2_session.mcp.url,
+        "headers": user2_session.mcp.headers,
+    })],
+)
+```
+
+## Advanced Configuration
+
+<CodeGroup>
+```python Tool Approval
+# Require approval for tool execution
+composio_mcp = HostedMCPTool(
+    tool_config={
+        "type": "mcp",
+        "server_url": session.mcp.url,
+        "require_approval": "always",  # or "never", "on_error"
+        "headers": session.mcp.headers,
+    }
+)
+```
+
+```python Async Execution
+import asyncio
+
+async def main():
+    result = await Runner.run(
+        starting_agent=agent,
+        input="Find my last email and summarize it.",
+    )
+    print(result.final_output)
+
+asyncio.run(main())
+```
+</CodeGroup>
+
+## Available Tools
+
+The agent automatically has access to all tools in the user's connected accounts:
+
+- Gmail: Send/read emails, search, manage labels
+- Slack: Send messages, create channels, manage users
+- GitHub: Create issues, PRs, manage repositories
+- Google Calendar: Create events, manage schedules
+- And 200+ more integrations
+
+## Best Practices
+
+<Check>**User-Specific Sessions**: Always create separate sessions for different users to maintain data isolation</Check>
+
+<Check>**Error Handling**: Wrap agent execution in try-catch blocks to handle authentication or API errors</Check>
+
+<Check>**Clear Instructions**: Provide clear, specific instructions to help the agent choose the right tools</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="LangChain Example" icon="link" href="/examples/python/langchain">
+    Use Composio with LangChain in Python
+  </Card>
+  <Card title="CrewAI Example" icon="users" href="/examples/python/crewai">
+    Build multi-agent systems with CrewAI
+  </Card>
+</CardGroup>

@@ -1,0 +1,288 @@
+---
+title: Connected Accounts
+description: Manage third-party service connections and authentication
+---
+
+Connected Accounts represent authenticated connections to third-party services. The `ConnectedAccounts` class provides methods to create, manage, and maintain these connections.
+
+## Accessing Connected Accounts
+
+```python
+from composio import Composio
+
+composio = Composio()
+accounts = composio.connected_accounts
+```
+
+## Methods
+
+### initiate
+
+Create a new connected account and return a connection request.
+
+```python
+connection_request = composio.connected_accounts.initiate(
+    user_id="user_123",
+    auth_config_id="ac_xxx",
+    callback_url="https://your-app.com/callback"
+)
+
+print(f"Redirect URL: {connection_request.redirect_url}")
+
+# Wait for connection
+connected_account = connection_request.wait_for_connection(timeout=60)
+```
+
+<ParamField path="user_id" type="str" required>
+  The user ID to create the connected account for.
+</ParamField>
+
+<ParamField path="auth_config_id" type="str" required>
+  The auth config ID to use for authentication.
+</ParamField>
+
+<ParamField path="callback_url" type="str">
+  Callback URL for OAuth redirects.
+</ParamField>
+
+<ParamField path="allow_multiple" type="bool" default="False">
+  Allow multiple connected accounts for the same user and auth config.
+</ParamField>
+
+<ParamField path="config" type="ConnectionState">
+  Connection configuration (for API key, basic auth, etc.).
+</ParamField>
+
+### link
+
+Create a Composio Connect Link for user authentication.
+
+```python
+connection_request = composio.connected_accounts.link(
+    user_id="user_123",
+    auth_config_id="ac_xxx",
+    callback_url="https://your-app.com/callback"
+)
+
+print(f"Visit: {connection_request.redirect_url}")
+```
+
+### get
+
+Retrieve a specific connected account.
+
+```python
+account = composio.connected_accounts.get("ca_xxx")
+print(f"Status: {account.status}")
+```
+
+### list
+
+List connected accounts with filtering.
+
+```python
+accounts = composio.connected_accounts.list(
+    user_ids=["user_123"],
+    auth_config_ids=["ac_xxx"],
+    statuses=["ACTIVE"]
+)
+
+for account in accounts.items:
+    print(f"{account.id}: {account.status}")
+```
+
+### enable
+
+Enable a connected account.
+
+```python
+composio.connected_accounts.enable("ca_xxx")
+```
+
+### disable
+
+Disable a connected account.
+
+```python
+composio.connected_accounts.disable("ca_xxx")
+```
+
+### refresh
+
+Refresh account credentials.
+
+```python
+composio.connected_accounts.refresh("ca_xxx")
+```
+
+### delete
+
+Delete a connected account.
+
+```python
+composio.connected_accounts.delete("ca_xxx")
+```
+
+### wait_for_connection
+
+Wait for a connection to become active.
+
+```python
+account = composio.connected_accounts.wait_for_connection(
+    id="ca_xxx",
+    timeout=60
+)
+```
+
+## Connection Request
+
+The `ConnectionRequest` object is returned by `initiate()` and `link()`.
+
+### Properties
+
+<ResponseField name="id" type="str">
+  The connected account ID.
+</ResponseField>
+
+<ResponseField name="status" type="str">
+  Connection status (e.g., "INITIATED", "ACTIVE").
+</ResponseField>
+
+<ResponseField name="redirect_url" type="str | None">
+  OAuth redirect URL for user authorization.
+</ResponseField>
+
+### Methods
+
+<ResponseField name="wait_for_connection" type="(timeout: float) -> ConnectedAccount">
+  Wait for the connection to become active.
+  
+  ```python
+  account = connection_request.wait_for_connection(timeout=300)
+  ```
+</ResponseField>
+
+## Auth Schemes
+
+Use the `auth_scheme` helper to create connections with different authentication methods.
+
+```python
+from composio import auth_scheme
+
+# API Key
+connection = composio.connected_accounts.initiate(
+    user_id="user_123",
+    auth_config_id="ac_xxx",
+    config=auth_scheme.api_key(
+        options={"api_key": "your-api-key"}
+    )
+)
+
+# Basic Auth
+connection = composio.connected_accounts.initiate(
+    user_id="user_123",
+    auth_config_id="ac_xxx",
+    config=auth_scheme.basic(
+        options={
+            "username": "user",
+            "password": "pass"
+        }
+    )
+)
+
+# Bearer Token
+connection = composio.connected_accounts.initiate(
+    user_id="user_123",
+    auth_config_id="ac_xxx",
+    config=auth_scheme.bearer_token(
+        options={"token": "your-token"}
+    )
+)
+```
+
+## Connection Statuses
+
+- `ACTIVE`: Connection is established and working
+- `INACTIVE`: Connection is temporarily disabled
+- `PENDING`: Connection is being processed
+- `INITIATED`: Connection request has started
+- `EXPIRED`: Connection credentials have expired
+- `FAILED`: Connection attempt failed
+
+## Examples
+
+### OAuth Flow
+
+```python
+# Step 1: Initiate connection
+connection = composio.connected_accounts.initiate(
+    user_id="user_123",
+    auth_config_id="ac_github",
+    callback_url="https://myapp.com/callback"
+)
+
+# Step 2: Redirect user
+print(f"Please visit: {connection.redirect_url}")
+
+# Step 3: Wait for completion
+try:
+    account = connection.wait_for_connection(timeout=300)
+    print(f"Success! Account ID: {account.id}")
+except Exception as e:
+    print(f"Connection failed: {e}")
+```
+
+### API Key Authentication
+
+```python
+from composio import auth_scheme
+
+connection = composio.connected_accounts.initiate(
+    user_id="user_123",
+    auth_config_id="ac_xxx",
+    config=auth_scheme.api_key(
+        options={"api_key": "sk_live_xxx"}
+    )
+)
+
+account = connection.wait_for_connection()
+print(f"Connected: {account.id}")
+```
+
+### List User Connections
+
+```python
+accounts = composio.connected_accounts.list(
+    user_ids=["user_123"],
+    statuses=["ACTIVE"]
+)
+
+for account in accounts.items:
+    print(f"Toolkit: {account.toolkit.name}")
+    print(f"Status: {account.status}")
+    print(f"Created: {account.created_at}")
+```
+
+### Refresh Expired Connection
+
+```python
+try:
+    composio.connected_accounts.refresh("ca_xxx")
+    print("Credentials refreshed successfully")
+except Exception as e:
+    print(f"Refresh failed: {e}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Auth Configs" icon="key" href="/python/api/auth-configs">
+    Configure authentication
+  </Card>
+  <Card title="Tools" icon="wrench" href="/python/api/tools">
+    Execute tools with connections
+  </Card>
+  <Card title="Toolkits" icon="box" href="/python/api/toolkits">
+    Authorize toolkits
+  </Card>
+</CardGroup>

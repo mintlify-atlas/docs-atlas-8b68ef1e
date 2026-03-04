@@ -1,0 +1,186 @@
+---
+title: Tool Router
+description: Advanced tool routing with session management
+---
+
+Tool Router provides intelligent tool routing with user-specific sessions, connection management, and MCP server integration.
+
+## Quick Start
+
+```python
+from composio import Composio
+
+composio = Composio()
+
+# Create a session
+session = composio.tool_router.create(
+    user_id="user_123",
+    toolkits=["github", "slack"]
+)
+
+# Get tools for the session
+tools = session.tools()
+
+# Authorize a toolkit
+connection = session.authorize("gmail")
+print(f"Redirect to: {connection.redirect_url}")
+
+# Check toolkit states
+toolkit_states = session.toolkits()
+for toolkit in toolkit_states.items:
+    print(f"{toolkit.name}: {toolkit.connection.is_active if toolkit.connection else 'N/A'}")
+```
+
+## Creating Sessions
+
+### Basic Session
+
+```python
+session = composio.tool_router.create(
+    user_id="user_123",
+    toolkits=["github", "slack"]
+)
+```
+
+### With Tool Filtering
+
+```python
+session = composio.tool_router.create(
+    user_id="user_123",
+    tools={
+        "github": ["GITHUB_CREATE_ISSUE", "GITHUB_LIST_REPOS"],
+        "slack": {"disable": ["SLACK_DELETE_MESSAGE"]}
+    }
+)
+```
+
+### With Connection Management
+
+```python
+session = composio.tool_router.create(
+    user_id="user_123",
+    toolkits=["github"],
+    manage_connections={
+        "enable": True,
+        "callback_url": "https://myapp.com/callback",
+        "wait_for_connections": True
+    }
+)
+```
+
+### With Tags
+
+```python
+session = composio.tool_router.create(
+    user_id="user_123",
+    toolkits=["github"],
+    tags=["readOnlyHint", "idempotentHint"]
+)
+```
+
+## Session Methods
+
+### tools()
+
+Get provider-wrapped tools for the session.
+
+```python
+tools = session.tools()
+
+# Use with your AI framework
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    tools=tools,
+    messages=[...]
+)
+```
+
+### authorize()
+
+Authorize a toolkit for the user.
+
+```python
+connection = session.authorize(
+    "github",
+    callback_url="https://myapp.com/callback"
+)
+
+print(f"Redirect to: {connection.redirect_url}")
+account = connection.wait_for_connection(timeout=300)
+```
+
+### toolkits()
+
+Get toolkit connection states.
+
+```python
+states = session.toolkits(
+    is_connected=False  # Only disconnected toolkits
+)
+
+for toolkit in states.items:
+    if toolkit.connection and not toolkit.connection.is_active:
+        print(f"Please connect: {toolkit.name}")
+```
+
+## Using Existing Sessions
+
+```python
+# Retrieve an existing session
+session = composio.tool_router.use("session_123")
+
+# Use session normally
+tools = session.tools()
+```
+
+## MCP Server
+
+Each session includes an MCP server configuration:
+
+```python
+session = composio.tool_router.create(
+    user_id="user_123",
+    toolkits=["github"]
+)
+
+print(f"MCP URL: {session.mcp.url}")
+print(f"MCP Type: {session.mcp.type}")
+print(f"Headers: {session.mcp.headers}")
+```
+
+## Complete Example
+
+```python
+from composio import Composio
+from openai import OpenAI
+
+composio = Composio()
+openai_client = OpenAI()
+
+# Create session
+session = composio.tool_router.create(
+    user_id="user_123",
+    toolkits=["github"],
+    manage_connections=True
+)
+
+# Check if GitHub is connected
+states = session.toolkits(toolkits=["github"])
+github_state = states.items[0]
+
+if not github_state.connection or not github_state.connection.is_active:
+    # Need to connect
+    connection = session.authorize("github")
+    print(f"Please visit: {connection.redirect_url}")
+    connection.wait_for_connection()
+
+# Get tools
+tools = session.tools()
+
+# Use with OpenAI
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    tools=tools,
+    messages=[{"role": "user", "content": "Create an issue"}]
+)
+```

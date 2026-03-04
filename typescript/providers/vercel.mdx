@@ -1,0 +1,203 @@
+---
+title: Vercel AI SDK Provider
+description: Use Composio tools with Vercel AI SDK
+---
+
+The Vercel provider wraps Composio tools for use with the Vercel AI SDK.
+
+## Installation
+
+```bash
+npm install @composio/vercel ai @ai-sdk/openai
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { VercelProvider } from '@composio/vercel';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new VercelProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const result = await generateText({
+  model: openai('gpt-4'),
+  tools,
+  prompt: 'Create a GitHub issue titled "Bug Report"'
+});
+
+console.log(result.text);
+```
+
+## Streaming
+
+```typescript
+import { streamText } from 'ai';
+
+const result = streamText({
+  model: openai('gpt-4'),
+  tools,
+  prompt: 'Create a GitHub issue'
+});
+
+for await (const chunk of result.textStream) {
+  process.stdout.write(chunk);
+}
+```
+
+## Next.js API Route
+
+```typescript
+// app/api/chat/route.ts
+import { Composio } from '@composio/core';
+import { VercelProvider } from '@composio/vercel';
+import { streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new VercelProvider()
+});
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const tools = await composio.tools.get('default', {
+    toolkits: ['github']
+  });
+
+  const result = streamText({
+    model: openai('gpt-4'),
+    tools,
+    messages
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+## Client Component
+
+```typescript
+// app/page.tsx
+'use client';
+
+import { useChat } from 'ai/react';
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat();
+
+  return (
+    <div>
+      {messages.map(m => (
+        <div key={m.id}>
+          <strong>{m.role}:</strong> {m.content}
+        </div>
+      ))}
+
+      <form onSubmit={handleSubmit}>
+        <input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Ask me to create a GitHub issue..."
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  );
+}
+```
+
+## Strict Mode
+
+Enable strict mode to remove non-required properties:
+
+```typescript
+const composio = new Composio({
+  apiKey: 'your-key',
+  provider: new VercelProvider({ strict: true })
+});
+```
+
+## Tool Results
+
+```typescript
+import { generateText } from 'ai';
+
+const result = await generateText({
+  model: openai('gpt-4'),
+  tools,
+  prompt: 'Create a GitHub issue'
+});
+
+// Access tool calls and results
+console.log(result.toolCalls);
+console.log(result.toolResults);
+```
+
+## Tool Format
+
+The Vercel provider wraps tools in this format:
+
+```typescript
+import { tool } from 'ai';
+
+// Each tool is wrapped as:
+const githubTool = tool({
+  description: 'Create a new GitHub issue',
+  inputSchema: zodSchema,
+  execute: async (params) => {
+    return await composio.tools.execute(...);
+  }
+});
+
+// Tools are organized in a ToolSet
+type VercelToolCollection = {
+  [slug: string]: VercelTool;
+};
+```
+
+## Best Practices
+
+1. **Streaming**: Use streamText for better UX
+2. **Error Handling**: Handle tool execution errors
+3. **Type Safety**: Use TypeScript for type safety
+4. **Next.js Integration**: Use API routes for server-side execution
+5. **Client Hooks**: Use useChat for React components
+
+## TypeScript Types
+
+```typescript
+import type { ToolSet, Tool } from 'ai';
+
+// Tool collection
+type VercelToolCollection = ToolSet;
+
+// Single tool
+type VercelTool = Tool;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Provider" icon="brain" href="/typescript/providers/openai">
+    Use with OpenAI directly
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up authentication
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View examples
+  </Card>
+</CardGroup>

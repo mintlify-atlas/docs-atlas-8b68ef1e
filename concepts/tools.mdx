@@ -1,0 +1,314 @@
+---
+title: Tools
+description: Learn how to work with tools in the Composio SDK
+---
+
+# Tools
+
+Tools are the fundamental building blocks of the Composio SDK. They represent individual actions that can be executed on third-party services, such as creating a GitHub repository, sending a Slack message, or retrieving Hacker News data.
+
+## Overview
+
+The `Tools` class manages tool operations in the Composio SDK. It provides methods to list, retrieve, and execute tools, along with support for custom tools and execution modifiers.
+
+**Source:** `ts/packages/core/src/models/Tools.ts`
+
+## Listing Tools
+
+### Get Tools from Toolkits
+
+Retrieve tools from specific toolkits with optional filtering:
+
+```typescript
+// Get tools from the GitHub toolkit
+const githubTools = await composio.tools.getRawComposioTools({
+  toolkits: ['github'],
+  limit: 10
+});
+
+// Get all important tools from multiple toolkits
+const tools = await composio.tools.getRawComposioTools({
+  toolkits: ['github', 'slack'],
+  important: true
+});
+```
+
+<Info>
+When fetching tools by toolkit without specifying `tools`, `tags`, `search`, or `limit` parameters, the SDK automatically sets `important: true` to return only the most commonly used tools.
+</Info>
+
+### Get Specific Tools
+
+```typescript
+// Get specific tools by slug
+const specificTools = await composio.tools.getRawComposioTools({
+  tools: ['GITHUB_GET_REPOS', 'HACKERNEWS_GET_USER']
+});
+```
+
+### Search for Tools
+
+```typescript
+// Search for tools by keyword
+const searchResults = await composio.tools.getRawComposioTools({
+  search: 'user management'
+});
+```
+
+### Filter by Authentication
+
+```typescript
+// Get tools by authentication config
+const authSpecificTools = await composio.tools.getRawComposioTools({
+  authConfigIds: ['auth_config_123']
+});
+```
+
+## Retrieving a Single Tool
+
+Fetch a specific tool by its slug:
+
+```typescript
+// Get a tool by slug
+const tool = await composio.tools.getRawComposioToolBySlug('GITHUB_GET_REPOS');
+console.log(tool.name, tool.description);
+
+// Access tool properties
+const githubTool = await composio.tools.getRawComposioToolBySlug('GITHUB_CREATE_ISSUE');
+console.log({
+  slug: githubTool.slug,
+  name: githubTool.name,
+  toolkit: githubTool.toolkit?.name,
+  version: githubTool.version,
+  availableVersions: githubTool.availableVersions,
+  inputParameters: githubTool.inputParameters
+});
+```
+
+## Getting Provider-Wrapped Tools
+
+The `get` method fetches tools and wraps them in provider-specific format:
+
+```typescript
+// Get tools from the GitHub toolkit
+const tools = await composio.tools.get('default', {
+  toolkits: ['github'],
+  limit: 10
+});
+
+// Get tools with search
+const searchTools = await composio.tools.get('default', {
+  search: 'user',
+  limit: 10
+});
+
+// Get a specific tool by slug
+const hackerNewsUserTool = await composio.tools.get('default', 'HACKERNEWS_GET_USER');
+```
+
+## Executing Tools
+
+### Basic Execution
+
+<Note>
+By default, manual tool execution requires a specific toolkit version. If the version resolves to "latest", execution will throw a `ComposioToolVersionRequiredError` unless `dangerouslySkipVersionCheck` is set to `true`.
+</Note>
+
+```typescript
+// Execute with a specific version (recommended for production)
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'default',
+  version: '20250909_00',
+  arguments: { owner: 'composio' }
+});
+```
+
+### Version Control Options
+
+```typescript
+// Execute with SDK-level toolkit versions configuration
+const composio = new Composio({ 
+  toolkitVersions: { github: '20250909_00' } 
+});
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'default',
+  arguments: { owner: 'composio' }
+});
+
+// Execute with dangerouslySkipVersionCheck (not recommended for production)
+const result = await composio.tools.execute('HACKERNEWS_GET_USER', {
+  userId: 'default',
+  arguments: { userId: 'pg' },
+  dangerouslySkipVersionCheck: true // Allows execution with "latest" version
+});
+```
+
+### Execution with Modifiers
+
+Modifiers allow you to transform inputs and outputs during tool execution:
+
+```typescript
+const result = await composio.tools.execute('GITHUB_GET_ISSUES', {
+  userId: 'default',
+  version: '20250909_00',
+  arguments: { owner: 'composio', repo: 'sdk' }
+}, {
+  beforeExecute: ({ toolSlug, toolkitSlug, params }) => {
+    console.log(`Executing ${toolSlug} from ${toolkitSlug}`);
+    return params;
+  },
+  afterExecute: ({ toolSlug, toolkitSlug, result }) => {
+    console.log(`Completed ${toolSlug}`);
+    return result;
+  }
+});
+```
+
+## Tool Schema Modification
+
+Transform tool schemas before using them:
+
+```typescript
+// Get a tool with schema transformation
+const customizedTool = await composio.tools.getRawComposioToolBySlug(
+  'SLACK_SEND_MESSAGE',
+  {
+    modifySchema: ({ toolSlug, toolkitSlug, schema }) => {
+      return {
+        ...schema,
+        description: `Enhanced ${schema.description} with custom modifications`,
+        customMetadata: {
+          lastModified: new Date().toISOString(),
+          toolkit: toolkitSlug
+        }
+      };
+    }
+  }
+);
+
+// Get tools with schema modification
+const customizedTools = await composio.tools.getRawComposioTools({
+  toolkits: ['github'],
+  limit: 5
+}, {
+  modifySchema: ({ toolSlug, toolkitSlug, schema }) => {
+    return {
+      ...schema,
+      customProperty: `Modified ${toolSlug} from ${toolkitSlug}`,
+      tags: [...(schema.tags || []), 'customized']
+    };
+  }
+});
+```
+
+## Tool Properties
+
+Every tool has the following key properties:
+
+- `slug` - Unique identifier (e.g., 'GITHUB_GET_REPOS')
+- `name` - Human-readable name
+- `description` - Tool description
+- `inputParameters` - JSON Schema for input parameters
+- `outputParameters` - JSON Schema for output response
+- `toolkit` - Associated toolkit information
+- `version` - Current tool version
+- `availableVersions` - List of available versions
+- `isDeprecated` - Whether the tool is deprecated
+- `isNoAuth` - Whether authentication is required
+- `tags` - Categorization tags
+
+## Advanced Features
+
+### Tool Router Meta Tools
+
+Fetch meta tools for tool router sessions:
+
+```typescript
+const metaTools = await composio.tools.getRawToolRouterMetaTools('session_123');
+console.log(metaTools);
+```
+
+### Execute Meta Tools
+
+```typescript
+const result = await composio.tools.executeMetaTool(
+  'TOOL_SLUG',
+  {
+    sessionId: 'session_123',
+    arguments: { param: 'value' }
+  },
+  {
+    beforeExecute: ({ toolSlug, sessionId, params }) => {
+      console.log(`Executing meta tool ${toolSlug}`);
+      return params;
+    }
+  }
+);
+```
+
+### Proxy Execute
+
+Send custom requests to toolkits:
+
+```typescript
+const response = await composio.tools.proxyExecute({
+  toolkitSlug: 'github',
+  userId: 'default',
+  endpoint: '/repos/owner/repo/issues',
+  method: 'GET',
+  parameters: [
+    { name: 'state', in: 'query', value: 'open' }
+  ]
+});
+console.log(response.data);
+```
+
+### Get Tool Input Parameters
+
+```typescript
+// Get input parameters for a specific tool
+const inputParams = await composio.tools.getInput('GITHUB_CREATE_ISSUE', {
+  userId: 'default'
+});
+console.log(inputParams.schema);
+```
+
+### Get All Available Tools
+
+```typescript
+// Get all available tools as an enum (used primarily by CLI)
+const toolsEnum = await composio.tools.getToolsEnum();
+console.log(toolsEnum.items);
+```
+
+## Auto File Upload/Download
+
+The SDK supports automatic file handling for tools that work with files:
+
+```typescript
+const composio = new Composio({
+  apiKey: 'your-key',
+  autoUploadDownloadFiles: true // Enable automatic file handling
+});
+```
+
+<Tip>
+When `autoUploadDownloadFiles` is enabled, the SDK automatically uploads files before execution and downloads result files after execution.
+</Tip>
+
+## Error Handling
+
+Common errors when working with tools:
+
+- `ComposioToolNotFoundError` - Tool with the given slug doesn't exist
+- `ComposioToolVersionRequiredError` - Version resolves to "latest" and `dangerouslySkipVersionCheck` is not true
+- `ComposioToolExecutionError` - Error during tool execution
+- `ValidationError` - Invalid parameters passed to tool methods
+- `ComposioProviderNotDefinedError` - Provider not configured when initializing Tools
+
+## Related Resources
+
+- [Toolkits](/concepts/toolkits) - Collections of related tools
+- [Custom Tools](/concepts/custom-tools) - Create your own tools
+- [Connected Accounts](/concepts/connected-accounts) - Authenticate with external services
+- [Providers](/concepts/providers) - AI framework integrations

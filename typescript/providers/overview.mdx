@@ -1,0 +1,271 @@
+---
+title: Providers Overview
+description: Choose the right AI framework provider for your application
+---
+
+Providers wrap Composio tools in the format expected by your AI framework. Composio supports 10+ popular AI frameworks out of the box.
+
+## What are Providers?
+
+Providers transform Composio tools into framework-specific formats:
+
+- **OpenAI**: OpenAI function calling format
+- **Anthropic**: Claude tool use format
+- **Vercel AI SDK**: Vercel AI tool format
+- **LangChain**: DynamicStructuredTool
+- **LlamaIndex**: LlamaIndex tool format
+- **Google GenAI**: Google function declarations
+- **Mastra**: Mastra tool format
+- **Cloudflare**: Cloudflare Workers AI format
+
+## Quick Start
+
+<Tabs>
+  <Tab title="OpenAI">
+    ```typescript
+    import { Composio } from '@composio/core';
+    import { OpenAIProvider } from '@composio/openai';
+    import OpenAI from 'openai';
+
+    const composio = new Composio({
+      apiKey: 'your-key',
+      provider: new OpenAIProvider()
+    });
+
+    const tools = await composio.tools.get('default', {
+      toolkits: ['github']
+    });
+
+    const openai = new OpenAI();
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      tools,
+      messages: [{ role: 'user', content: 'Create an issue' }]
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Anthropic">
+    ```typescript
+    import { Composio } from '@composio/core';
+    import { AnthropicProvider } from '@composio/anthropic';
+    import Anthropic from '@anthropic-ai/sdk';
+
+    const composio = new Composio({
+      apiKey: 'your-key',
+      provider: new AnthropicProvider()
+    });
+
+    const tools = await composio.tools.get('default', {
+      toolkits: ['github']
+    });
+
+    const anthropic = new Anthropic();
+    const message = await anthropic.messages.create({
+      model: 'claude-3-opus-20240229',
+      max_tokens: 1024,
+      tools,
+      messages: [{ role: 'user', content: 'Create an issue' }]
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Vercel AI SDK">
+    ```typescript
+    import { Composio } from '@composio/core';
+    import { VercelProvider } from '@composio/vercel';
+    import { generateText } from 'ai';
+    import { openai } from '@ai-sdk/openai';
+
+    const composio = new Composio({
+      apiKey: 'your-key',
+      provider: new VercelProvider()
+    });
+
+    const tools = await composio.tools.get('default', {
+      toolkits: ['github']
+    });
+
+    const result = await generateText({
+      model: openai('gpt-4'),
+      tools,
+      prompt: 'Create a GitHub issue'
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Available Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="brain" href="/typescript/providers/openai">
+    OpenAI GPT-4 and function calling
+  </Card>
+  <Card title="OpenAI Agents" icon="robot" href="/typescript/providers/openai-agents">
+    OpenAI Agents SDK (Swarm)
+  </Card>
+  <Card title="Anthropic" icon="message-bot" href="/typescript/providers/anthropic">
+    Claude with tool use
+  </Card>
+  <Card title="Vercel AI SDK" icon="bolt" href="/typescript/providers/vercel">
+    Vercel AI SDK integration
+  </Card>
+  <Card title="LangChain" icon="link" href="/typescript/providers/langchain">
+    LangChain.js tools
+  </Card>
+  <Card title="LlamaIndex" icon="llama" href="/typescript/providers/llamaindex">
+    LlamaIndex.TS tools
+  </Card>
+  <Card title="Google GenAI" icon="sparkles" href="/typescript/providers/google">
+    Google Gemini integration
+  </Card>
+  <Card title="Mastra" icon="wand-magic-sparkles" href="/typescript/providers/mastra">
+    Mastra.ai framework
+  </Card>
+  <Card title="Cloudflare" icon="cloud" href="/typescript/providers/cloudflare">
+    Cloudflare Workers AI
+  </Card>
+  <Card title="Custom Provider" icon="code" href="/typescript/providers/custom">
+    Build your own provider
+  </Card>
+</CardGroup>
+
+## Provider Types
+
+### Agentic Providers
+
+Agentic providers handle tool execution automatically:
+
+- **LangChain**: Tools execute when agents call them
+- **LlamaIndex**: Tools execute during agent runs
+- **Vercel AI SDK**: Tools execute in the AI SDK flow
+- **Mastra**: Tools execute in Mastra workflows
+
+```typescript
+// With agentic providers, tools execute automatically
+const tools = await composio.tools.get('default', { toolkits: ['github'] });
+
+// The framework handles execution
+const agent = new Agent({ tools });
+await agent.run('Create an issue');
+```
+
+### Non-Agentic Providers
+
+Non-agentic providers require manual tool execution:
+
+- **OpenAI**: You handle tool calls from the response
+- **Anthropic**: You process tool_use blocks
+- **Google GenAI**: You handle function calls
+- **Cloudflare**: You process tool calls
+
+```typescript
+// With non-agentic providers, you handle execution
+const tools = await composio.tools.get('default', { toolkits: ['github'] });
+
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  tools,
+  messages: [{ role: 'user', content: 'Create an issue' }]
+});
+
+// Manually execute tool calls
+for (const toolCall of response.choices[0].message.tool_calls || []) {
+  const result = await composio.tools.execute(toolCall.function.name, {
+    userId: 'default',
+    arguments: JSON.parse(toolCall.function.arguments)
+  });
+}
+```
+
+## Choosing a Provider
+
+| Use Case | Recommended Provider |
+|----------|---------------------|
+| Production apps with OpenAI | **OpenAI** |
+| Claude-based applications | **Anthropic** |
+| Next.js with streaming | **Vercel AI SDK** |
+| Complex agent workflows | **LangChain** |
+| RAG and retrieval | **LlamaIndex** |
+| Google Gemini | **Google GenAI** |
+| Modern AI frameworks | **Mastra** |
+| Edge deployment | **Cloudflare** |
+| Custom requirements | **Custom Provider** |
+
+## Provider Configuration
+
+Some providers accept configuration options:
+
+```typescript
+import { AnthropicProvider } from '@composio/anthropic';
+import { VercelProvider } from '@composio/vercel';
+
+// Anthropic with caching
+const composio = new Composio({
+  provider: new AnthropicProvider({
+    cacheTools: true // Enable ephemeral caching
+  })
+});
+
+// Vercel with strict mode
+const composio = new Composio({
+  provider: new VercelProvider({
+    strict: true // Remove non-required properties
+  })
+});
+```
+
+## Multiple Providers
+
+You can use multiple providers in the same application:
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAIProvider } from '@composio/openai';
+import { AnthropicProvider } from '@composio/anthropic';
+
+// For OpenAI
+const composioOpenAI = new Composio({
+  apiKey: 'your-key',
+  provider: new OpenAIProvider()
+});
+
+// For Anthropic
+const composioAnthropic = new Composio({
+  apiKey: 'your-key',
+  provider: new AnthropicProvider()
+});
+
+const openaiTools = await composioOpenAI.tools.get('default', { toolkits: ['github'] });
+const anthropicTools = await composioAnthropic.tools.get('default', { toolkits: ['github'] });
+```
+
+## Default Provider
+
+If no provider is specified, `OpenAIProvider` is used by default:
+
+```typescript
+const composio = new Composio({ apiKey: 'your-key' });
+// Equivalent to:
+const composio = new Composio({
+  apiKey: 'your-key',
+  provider: new OpenAIProvider()
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Provider" icon="brain" href="/typescript/providers/openai">
+    Get started with OpenAI
+  </Card>
+  <Card title="Anthropic Provider" icon="message-bot" href="/typescript/providers/anthropic">
+    Use Claude with tools
+  </Card>
+  <Card title="Vercel AI SDK" icon="bolt" href="/typescript/providers/vercel">
+    Build with Vercel AI
+  </Card>
+  <Card title="Custom Provider" icon="code" href="/typescript/providers/custom">
+    Create your own provider
+  </Card>
+</CardGroup>

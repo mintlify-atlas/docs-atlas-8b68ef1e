@@ -1,0 +1,288 @@
+---
+title: CLI Installation
+description: Install and set up the Composio command-line interface
+---
+
+## Quick Install (Recommended)
+
+The fastest way to install the Composio CLI is using the one-line installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh | bash
+```
+
+### Install Specific Version
+
+You can install a specific version by passing it as an argument:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh | bash -s -- v0.1.24
+```
+
+### What the Installer Does
+
+The install script automatically:
+
+- Detects your platform and architecture
+- Downloads the appropriate binary from GitHub releases
+- Installs to `~/.composio/bin/composio`
+- Updates your shell configuration (`.bashrc`, `.zshrc`, or `.config/fish/config.fish`)
+- Adds the binary to your PATH
+
+## Package Manager Installation
+
+Alternatively, install the CLI using npm, pnpm, or yarn:
+
+<CodeGroup>
+
+```bash npm
+npm install -g @composio/cli
+```
+
+```bash pnpm
+pnpm add -g @composio/cli
+```
+
+```bash yarn
+yarn global add @composio/cli
+```
+
+</CodeGroup>
+
+## Manual Installation
+
+For manual installation from GitHub releases:
+
+<Steps>
+
+<Step title="Download the binary">
+  Go to the [releases page](https://github.com/ComposioHQ/composio/releases) and download the appropriate binary for your platform:
+
+  - `composio-linux-x64.zip` - Linux 64-bit
+  - `composio-linux-aarch64.zip` - Linux ARM64
+  - `composio-darwin-x64.zip` - macOS Intel
+  - `composio-darwin-aarch64.zip` - macOS Apple Silicon
+</Step>
+
+<Step title="Extract and install">
+  ```bash
+  # Extract the binary
+  unzip composio-*.zip
+
+  # Move to a directory in your PATH
+  sudo mv composio /usr/local/bin/
+
+  # Make it executable
+  chmod +x /usr/local/bin/composio
+  ```
+</Step>
+
+</Steps>
+
+## Verification
+
+After installation, verify the CLI is working correctly:
+
+<Steps>
+
+<Step title="Check version">
+  ```bash
+  composio --version
+  ```
+</Step>
+
+<Step title="View help">
+  ```bash
+  composio --help
+  ```
+</Step>
+
+<Step title="Login to Composio">
+  ```bash
+  composio login
+  ```
+  
+  This will open your browser to authenticate with your Composio account.
+</Step>
+
+<Step title="Verify authentication">
+  ```bash
+  composio whoami
+  ```
+  
+  This should display your account information.
+</Step>
+
+</Steps>
+
+## Getting Started
+
+Once installed and authenticated, you can start using the CLI:
+
+### Generate Types for Your Project
+
+<CodeGroup>
+
+```bash Auto-detect
+# Automatically detect project type and generate types
+composio generate
+```
+
+```bash TypeScript
+# Generate types for TypeScript projects
+composio ts generate
+```
+
+```bash Python
+# Generate types for Python projects
+composio py generate
+```
+
+</CodeGroup>
+
+### Common Commands
+
+```bash
+# View account information
+composio whoami
+
+# List available tools
+composio tools list
+
+# Connect an account
+composio connect github
+
+# View connected accounts
+composio accounts list
+```
+
+## Supported Platforms
+
+<Check>**Fully Supported**</Check>
+
+- Linux x86_64
+- Linux ARM64 (aarch64)
+- macOS x86_64 (Intel)
+- macOS ARM64 (Apple Silicon)
+
+<Warning>**Not Supported**</Warning>
+
+Windows is not directly supported. Use WSL (Windows Subsystem for Linux) or install via npm.
+
+## Environment Variables
+
+The installer respects these environment variables:
+
+- `COMPOSIO_INSTALL` - Installation directory (default: `~/.composio`)
+- `GITHUB` - GitHub base URL (default: `https://github.com`)
+
+### Custom Installation Directory
+
+```bash
+export COMPOSIO_INSTALL="/usr/local"
+curl -fsSL https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh | bash
+```
+
+## Troubleshooting
+
+### Permission Denied
+
+If you get permission errors when running the CLI:
+
+```bash
+chmod +x ~/.composio/bin/composio
+```
+
+### Command Not Found
+
+If `composio` is not found after installation:
+
+<Steps>
+
+<Step title="Restart your shell">
+  ```bash
+  exec $SHELL
+  ```
+</Step>
+
+<Step title="Or manually source your profile">
+  <CodeGroup>
+  
+  ```bash bash
+  source ~/.bashrc
+  ```
+  
+  ```bash zsh
+  source ~/.zshrc
+  ```
+  
+  ```bash fish
+  source ~/.config/fish/config.fish
+  ```
+  
+  </CodeGroup>
+</Step>
+
+<Step title="Check if the binary exists">
+  ```bash
+  ls -la ~/.composio/bin/composio
+  ```
+</Step>
+
+<Step title="Manually add to PATH">
+  ```bash
+  export PATH="$HOME/.composio/bin:$PATH"
+  ```
+</Step>
+
+</Steps>
+
+### Download Failures
+
+If the download fails:
+
+1. **Check your internet connection**
+2. **Try with verbose output:**
+   ```bash
+   curl -v -fsSL https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh | bash
+   ```
+
+3. **Manual download:**
+   ```bash
+   # Download the install script first
+   curl -O https://raw.githubusercontent.com/ComposioHQ/composio/main/install.sh
+   
+   # Review the script
+   cat install.sh
+   
+   # Run it
+   bash install.sh
+   ```
+
+## Uninstallation
+
+To remove the Composio CLI:
+
+```bash
+# Remove the binary and installation directory
+rm -rf ~/.composio
+
+# Remove from shell configuration
+# Edit ~/.bashrc, ~/.zshrc, or ~/.config/fish/config.fish
+# and remove these lines:
+# export COMPOSIO_INSTALL="$HOME/.composio"
+# export PATH="$COMPOSIO_INSTALL/bin:$PATH"
+```
+
+If installed via npm:
+
+```bash
+npm uninstall -g @composio/cli
+```
+
+## Next Steps
+
+- Learn about [CLI commands](/cli/overview)
+- Set up [authentication](/guides/authentication-flows)
+- Generate [type definitions](/cli/commands/generate)
+- Check out the [GitHub repository](https://github.com/ComposioHQ/composio)

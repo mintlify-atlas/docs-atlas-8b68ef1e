@@ -1,0 +1,253 @@
+---
+title: MCP Support
+description: Learn how to use Composio's Model Context Protocol (MCP) integration to connect AI tools with 500+ apps
+---
+
+## Overview
+
+Composio provides full support for the **Model Context Protocol (MCP)**, enabling seamless integration between AI models and external services. With MCP, you can create server instances that connect your AI tools to 500+ apps like Gmail, Slack, GitHub, and Notion.
+
+## What is MCP?
+
+The Model Context Protocol (MCP) is a standardized protocol that allows AI models to interact with external tools and services in a consistent way. Composio's MCP implementation provides:
+
+- **Unified Access**: Connect to 500+ apps through a single interface
+- **User-Specific Instances**: Generate unique server instances for each user
+- **Flexible Authentication**: Support for both chat-based and manual authentication
+- **Multi-Client Support**: Use with Claude Desktop, Cursor, VS Code, and other MCP-compatible clients
+
+## Key Features
+
+### MCP Server Management
+
+Composio's MCP class provides complete server lifecycle management:
+
+- Create and configure MCP servers with specific toolkits and tools
+- List and filter existing MCP servers
+- Update server configurations dynamically
+- Generate user-specific server instances
+- Delete servers when no longer needed
+
+### Authentication Options
+
+Choose between two authentication modes:
+
+1. **Chat-Based Authentication** (`manuallyManageConnections: false`): Users authenticate through conversational prompts when using the MCP server
+2. **Manual Authentication** (`manuallyManageConnections: true`): Pre-configure account connections outside of the MCP server
+
+## Basic Usage
+
+### Creating an MCP Server
+
+Create a new MCP server configuration with specific toolkits and tools:
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-api-key' });
+
+// Create server with toolkits
+const server = await composio.mcp.create('personal-mcp-server', {
+  toolkits: ['github', 'slack'],
+  allowedTools: ['GMAIL_FETCH_EMAILS', 'SLACK_SEND_MESSAGE'],
+  manuallyManageConnections: false
+});
+
+console.log('Server created:', server.name);
+console.log('MCP URL:', server.MCPUrl);
+console.log('Setup commands:', server.commands);
+```
+
+### Creating Server with Auth Configs
+
+For more control, specify auth configurations for each toolkit:
+
+```typescript
+const server = await composio.mcp.create('production-mcp-server', {
+  toolkits: [
+    { toolkit: 'gmail', authConfigId: 'ac_243434343' },
+    { toolkit: 'github', authConfigId: 'ac_567890123' }
+  ],
+  allowedTools: ['GMAIL_FETCH_EMAILS', 'GITHUB_CREATE_ISSUE'],
+  manuallyManageConnections: false
+});
+```
+
+### Generating User-Specific Instances
+
+Create a server instance for a specific user:
+
+```typescript
+// Using the create method's generate function
+const instance = await server.generate('user@example.com');
+
+console.log('Instance URL:', instance.url);
+console.log('User ID:', instance.userId);
+console.log('Allowed tools:', instance.allowedTools);
+
+// Or generate directly
+const instance = await composio.mcp.generate(
+  'user@example.com',
+  'mcp_server_id',
+  { manuallyManageConnections: false }
+);
+```
+
+### Listing MCP Servers
+
+Retrieve and filter existing MCP servers:
+
+```typescript
+// List all servers
+const allServers = await composio.mcp.list({});
+
+// List with pagination
+const pagedServers = await composio.mcp.list({
+  page: 2,
+  limit: 5
+});
+
+// Filter by toolkit
+const githubServers = await composio.mcp.list({
+  toolkits: ['github', 'slack']
+});
+
+// Filter by name
+const namedServers = await composio.mcp.list({
+  name: 'personal'
+});
+
+console.log(`Total pages: ${allServers.totalPages}`);
+console.log(`Current page: ${allServers.currentPage}`);
+console.log(`Servers: ${allServers.items.length}`);
+```
+
+### Retrieving Server Details
+
+Get detailed information about a specific server:
+
+```typescript
+const server = await composio.mcp.get('mcp_12345');
+
+console.log(server.name);
+console.log(server.allowedTools);
+console.log(server.toolkits);
+console.log(server.serverInstanceCount);
+
+// Access setup commands for different clients
+console.log('Claude setup:', server.commands.claude);
+console.log('Cursor setup:', server.commands.cursor);
+console.log('Windsurf setup:', server.commands.windsurf);
+```
+
+### Updating Server Configuration
+
+Modify existing server settings:
+
+```typescript
+// Update name only
+const updated = await composio.mcp.update('mcp_12345', {
+  name: 'My Updated MCP Server'
+});
+
+// Update toolkits and tools
+const serverWithNewTools = await composio.mcp.update('mcp_12345', {
+  toolkits: [
+    {
+      toolkit: 'github',
+      authConfigId: 'auth_abc123',
+      allowedTools: ['GITHUB_CREATE_ISSUE', 'GITHUB_LIST_REPOS']
+    },
+    {
+      toolkit: 'slack',
+      authConfigId: 'auth_xyz789',
+      allowedTools: ['SLACK_SEND_MESSAGE', 'SLACK_LIST_CHANNELS']
+    }
+  ]
+});
+
+// Update connection management
+const manualAuth = await composio.mcp.update('mcp_12345', {
+  name: 'Manual Auth Server',
+  manuallyManageConnections: true
+});
+```
+
+### Deleting an MCP Server
+
+Permanently remove a server configuration:
+
+```typescript
+const result = await composio.mcp.delete('mcp_12345');
+
+if (result.deleted) {
+  console.log(`Server ${result.id} successfully deleted`);
+}
+
+// Verify deletion
+const servers = await composio.mcp.list({});
+const exists = servers.items.some(s => s.id === 'mcp_12345');
+console.log('Server exists:', exists); // false
+```
+
+## MCP Server Instance
+
+When you generate an MCP server instance, you receive:
+
+```typescript
+interface MCPServerInstance {
+  id: string;                    // Server configuration ID
+  name: string;                  // Server name
+  type: 'streamable_http';       // Connection type
+  url: string;                   // User-specific server URL
+  userId: string;                // Associated user ID
+  allowedTools: string[];        // Available tools
+  authConfigs: string[];         // Auth configuration IDs
+}
+```
+
+Use the `url` field to connect your MCP client to the server instance.
+
+## Integration with AI Clients
+
+Composio MCP servers work with popular AI clients:
+
+- **Claude Desktop**: Use the Claude setup command from `server.commands.claude`
+- **Cursor**: Use the Cursor setup command from `server.commands.cursor`
+- **Windsurf**: Use the Windsurf setup command from `server.commands.windsurf`
+- **VS Code**: Configure using the MCP URL
+- **Custom Clients**: Connect using the standard MCP protocol
+
+## Best Practices
+
+1. **Use Descriptive Names**: Give your MCP servers clear, descriptive names
+2. **Limit Tool Access**: Only include necessary tools in `allowedTools` for security
+3. **Choose Authentication Mode**: Use chat-based auth for better UX, manual auth for more control
+4. **Monitor Instance Count**: Track `serverInstanceCount` to understand usage
+5. **Clean Up Unused Servers**: Delete servers you no longer need
+
+## Error Handling
+
+```typescript
+import { ValidationError } from '@composio/core';
+
+try {
+  const server = await composio.mcp.create('my-server', {
+    toolkits: ['github'],
+    manuallyManageConnections: false
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Invalid configuration:', error.message);
+  } else {
+    console.error('Server creation failed:', error);
+  }
+}
+```
+
+## Next Steps
+
+- Learn about [Rube](/mcp/rube) - Composio's pre-built MCP server
+- Explore [Available Toolkits](/concepts/toolkits)
+- Configure [Authentication](/concepts/authentication)
+- See [MCP.ts Source Code](https://github.com/ComposioHQ/composio/blob/main/ts/packages/core/src/models/MCP.ts)

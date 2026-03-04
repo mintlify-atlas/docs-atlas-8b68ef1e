@@ -1,0 +1,259 @@
+---
+title: Custom Tools Example
+description: Create and use custom tools with Composio SDK
+---
+
+This example demonstrates how to create custom tools with Composio, including both standalone tools and toolkit-integrated tools that can access authentication credentials.
+
+## Overview
+
+In this example, you'll learn how to:
+- Create custom tools with Zod schemas
+- Integrate custom tools with existing toolkits
+- Access authentication credentials in custom tools
+- Execute HTTP requests within custom tool logic
+- Use custom tools in your applications
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install @composio/core zod dotenv
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Create a `.env` file with your API key:
+    ```bash
+    COMPOSIO_API_KEY=your_composio_api_key
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import 'dotenv/config';
+import { z } from 'zod';
+
+/**
+ * Initialize Composio
+ */
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+});
+
+/**
+ * Create a custom hackernews tool
+ * This tool will be registerd in the composio instance and store in memory temporarily.
+ */
+const customToolSlug = 'GITHUB_STAR_COMPOSIOHQ_REPOSITORY';
+const tool = await composio.tools.createCustomTool({
+  slug: customToolSlug,
+  name: 'Github star composio repositories',
+  toolkitSlug: 'github',
+  description: 'For any given repository of the user composiohq, star the repository',
+  inputParams: z.object({
+    repository: z.string().describe('The repository to star'),
+  }),
+  execute: async (input, connectionConfig, executeToolRequest) => {
+    console.log('🚀 ~ execute: ~ params:', input);
+    console.log('🚀 ~ execute: ~ connectionConfig:', connectionConfig);
+
+    const result = await executeToolRequest({
+      endpoint: `/user/starred/composiohq/${input.repository}`,
+      method: 'PUT',
+    });
+    return result;
+  },
+});
+
+console.log('🚀 created tool:', tool);
+
+/**
+ * Main function to run the example
+ */
+async function main() {
+  try {
+    console.log('🚀 Starting Custom-tools Example...');
+
+    // Get available tools
+    const tools = await composio.tools.get('default', customToolSlug);
+
+    console.log('tools:', tools);
+
+    const result = await composio.tools.execute(customToolSlug, {
+      arguments: {
+        repository: 'composio',
+      },
+      userId: 'default',
+    });
+
+    console.log('🚀 Result:', result);
+  } catch (error) {
+    console.error('❌ Error running example:', error);
+  }
+}
+
+// Run the example
+main().catch(console.error);
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Define Tool Schema">
+    Use Zod to define the input parameters for your tool. Each parameter should have a description for better AI understanding.
+    
+    ```typescript
+    inputParams: z.object({
+      repository: z.string().describe('The repository to star'),
+    })
+    ```
+  </Step>
+
+  <Step title="Specify Toolkit Integration">
+    By setting `toolkitSlug: 'github'`, the custom tool inherits GitHub's authentication and can make authenticated API calls.
+  </Step>
+
+  <Step title="Implement Execute Function">
+    The execute function receives three parameters:
+    - `input`: The validated input parameters
+    - `connectionConfig`: Authentication credentials for the toolkit
+    - `executeToolRequest`: Helper function to make authenticated HTTP requests
+  </Step>
+
+  <Step title="Make API Requests">
+    Use `executeToolRequest` to make authenticated requests to the toolkit's API. It automatically handles authentication headers.
+  </Step>
+
+  <Step title="Execute the Tool">
+    Call `composio.tools.execute()` with the tool slug and arguments to run your custom tool.
+  </Step>
+</Steps>
+
+## Execute Function Parameters
+
+<ParamField path="input" type="object">
+  The validated input parameters matching your Zod schema
+</ParamField>
+
+<ParamField path="connectionConfig" type="object">
+  Authentication credentials and configuration for the associated toolkit
+  
+  ```typescript
+  {
+    access_token: string,
+    // other auth fields depending on toolkit
+  }
+  ```
+</ParamField>
+
+<ParamField path="executeToolRequest" type="function">
+  Helper function to make authenticated HTTP requests
+  
+  ```typescript
+  executeToolRequest({
+    endpoint: '/api/endpoint',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    body?: object,
+    headers?: object,
+  })
+  ```
+</ParamField>
+
+## Expected Output
+
+```bash
+🚀 created tool: {
+  slug: 'GITHUB_STAR_COMPOSIOHQ_REPOSITORY',
+  name: 'Github star composio repositories',
+  description: 'For any given repository of the user composiohq, star the repository'
+}
+🚀 Starting Custom-tools Example...
+tools: [{
+  type: 'function',
+  function: {
+    name: 'GITHUB_STAR_COMPOSIOHQ_REPOSITORY',
+    description: 'For any given repository of the user composiohq, star the repository',
+    parameters: { ... }
+  }
+}]
+🚀 ~ execute: ~ params: { repository: 'composio' }
+🚀 ~ execute: ~ connectionConfig: { access_token: '...' }
+🚀 Result: {
+  successful: true,
+  data: { ... },
+  error: null
+}
+```
+
+## Creating Standalone Custom Tools
+
+You can also create custom tools without toolkit integration:
+
+```typescript
+const standaloneToolSlug = 'ADD_TWO_NUMBERS';
+const addTool = await composio.tools.createCustomTool({
+  slug: standaloneToolSlug,
+  name: 'Add Two Numbers',
+  description: 'Adds two numbers together',
+  inputParams: z.object({
+    a: z.number().describe('First number'),
+    b: z.number().describe('Second number'),
+  }),
+  execute: async (input) => {
+    return {
+      successful: true,
+      data: { result: input.a + input.b },
+      error: null,
+    };
+  },
+});
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Custom Business Logic" icon="code">
+    Wrap your internal APIs and business logic as tools for AI agents
+  </Card>
+  <Card title="API Extensions" icon="plug">
+    Extend existing toolkit capabilities with custom endpoints
+  </Card>
+  <Card title="Data Transformations" icon="shuffle">
+    Create tools that transform or aggregate data from multiple sources
+  </Card>
+  <Card title="Validation & Processing" icon="check">
+    Add custom validation or preprocessing before calling external APIs
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Descriptive Schemas">
+    Always add clear descriptions to your Zod schema fields. These descriptions help AI models understand how to use your tool correctly.
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    Always return a consistent result format with `successful`, `data`, and `error` fields to make error handling predictable.
+  </Accordion>
+
+  <Accordion title="Toolkit Integration">
+    Use `toolkitSlug` when your tool needs to authenticate with an existing service. This provides automatic credential management.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="File Handling" icon="file" href="/examples/typescript/file-handling">
+    Learn how to handle file uploads in tools
+  </Card>
+  <Card title="OpenAI Example" icon="brain" href="/examples/typescript/openai-basic">
+    Use custom tools with OpenAI
+  </Card>
+</CardGroup>

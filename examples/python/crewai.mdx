@@ -1,0 +1,392 @@
+---
+title: CrewAI Example
+description: Build multi-agent AI crews with Composio and CrewAI using MCP
+---
+
+This example demonstrates how to use Composio with CrewAI to create collaborative AI agent teams that can execute complex tasks using MCP (Model Context Protocol).
+
+## Overview
+
+In this example, you'll learn how to:
+- Integrate Composio with CrewAI using MCP
+- Create agents with access to Composio tools
+- Define tasks for agents to complete
+- Execute crew workflows with tool access
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    pip install composio crewai
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Create a `.env` file with your API keys:
+    ```bash
+    COMPOSIO_API_KEY=your_composio_api_key
+    OPENAI_API_KEY=your_openai_api_key
+    ```
+  </Step>
+
+  <Step title="Authenticate with Gmail">
+    ```bash
+    composio add gmail
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```python
+from crewai import Agent, Crew, Task
+from crewai.mcp import MCPServerHTTP
+from composio import Composio
+
+# Initialize Composio and create a session
+composio = Composio()
+session = composio.create(
+    user_id="user_123",
+)
+
+# Create an agent with Composio MCP server
+agent = Agent(
+    role="Gmail agent",
+    goal="helps with gmail related queries",
+    backstory="You are a helpful assistant that can use the tools provided to you.",
+    mcps=[
+        MCPServerHTTP(
+            url=session.mcp.url,
+            headers=session.mcp.headers,
+        )
+    ],
+)
+
+# Define task
+task = Task(
+    description=("Find the last email and summarize it."),
+    expected_output="A summary of the last email including sender, subject, and key points.",
+    agent=agent,
+)
+
+# Create and run the crew
+my_crew = Crew(agents=[agent], tasks=[task])
+result = my_crew.kickoff()
+print(result)
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Create Composio Session">
+    Initialize Composio and create a session for your user. This provides an MCP server endpoint with all connected tools.
+    
+    ```python
+    composio = Composio()
+    session = composio.create(user_id="user_123")
+    ```
+  </Step>
+
+  <Step title="Configure MCP Server">
+    Create an `MCPServerHTTP` instance that connects to Composio's MCP endpoint. This gives the agent access to all Composio tools.
+    
+    ```python
+    MCPServerHTTP(
+        url=session.mcp.url,
+        headers=session.mcp.headers,
+    )
+    ```
+  </Step>
+
+  <Step title="Create Agent with Tools">
+    Define an agent with a specific role, goal, and backstory. Add the MCP server to the `mcps` parameter to give it access to Composio tools.
+  </Step>
+
+  <Step title="Define Tasks">
+    Create tasks with clear descriptions and expected outputs. CrewAI will automatically select the appropriate tools to complete each task.
+  </Step>
+
+  <Step title="Execute Crew">
+    Create a `Crew` with your agents and tasks, then call `kickoff()` to start execution.
+  </Step>
+</Steps>
+
+## Multi-Agent Example
+
+Build a crew with multiple specialized agents:
+
+```python
+from crewai import Agent, Crew, Task, Process
+from crewai.mcp import MCPServerHTTP
+from composio import Composio
+
+composio = Composio()
+session = composio.create(user_id="user_123")
+
+mcp_server = MCPServerHTTP(
+    url=session.mcp.url,
+    headers=session.mcp.headers,
+)
+
+# Email agent - handles email operations
+email_agent = Agent(
+    role="Email Specialist",
+    goal="Manage and analyze emails efficiently",
+    backstory="Expert in email management and communication",
+    mcps=[mcp_server],
+)
+
+# Calendar agent - handles scheduling
+calendar_agent = Agent(
+    role="Calendar Manager",
+    goal="Organize and optimize schedules",
+    backstory="Expert in time management and scheduling",
+    mcps=[mcp_server],
+)
+
+# Define tasks
+email_task = Task(
+    description="Find all unread emails from this week and create a summary",
+    expected_output="A categorized summary of unread emails",
+    agent=email_agent,
+)
+
+calendar_task = Task(
+    description="Review this week's calendar and identify any scheduling conflicts",
+    expected_output="A list of scheduling conflicts with suggested resolutions",
+    agent=calendar_agent,
+)
+
+# Create crew with sequential process
+crew = Crew(
+    agents=[email_agent, calendar_agent],
+    tasks=[email_task, calendar_task],
+    process=Process.sequential,  # Tasks run in order
+    verbose=True,
+)
+
+result = crew.kickoff()
+print(result)
+```
+
+## Expected Output
+
+```bash
+Starting crew execution...
+
+[Gmail agent] Starting task: Find the last email and summarize it.
+[Gmail agent] Using tool: gmail_get_latest_email
+[Gmail agent] Task completed!
+
+Result:
+{
+  "summary": {
+    "from": "john@example.com",
+    "subject": "Q1 Project Update",
+    "received": "2 hours ago",
+    "key_points": [
+      "Project is on track for Q1 delivery",
+      "Budget review scheduled for next week",
+      "Team needs additional resources for testing phase"
+    ]
+  }
+}
+```
+
+## Agent Configuration
+
+<ParamField path="role" type="string" required>
+  The role or title of the agent (e.g., "Email Specialist", "Data Analyst")
+</ParamField>
+
+<ParamField path="goal" type="string" required>
+  The agent's objective and what it aims to accomplish
+</ParamField>
+
+<ParamField path="backstory" type="string" required>
+  The agent's background and expertise context
+</ParamField>
+
+<ParamField path="mcps" type="list[MCPServer]">
+  List of MCP servers providing tools to the agent
+</ParamField>
+
+<ParamField path="verbose" type="bool" default="false">
+  Whether to print detailed execution logs
+</ParamField>
+
+## Task Configuration
+
+<ParamField path="description" type="string" required>
+  Detailed description of what the task should accomplish
+</ParamField>
+
+<ParamField path="expected_output" type="string" required>
+  Clear specification of what the task output should look like
+</ParamField>
+
+<ParamField path="agent" type="Agent" required>
+  The agent responsible for executing this task
+</ParamField>
+
+## Process Types
+
+CrewAI supports different execution processes:
+
+<CodeGroup>
+```python Sequential
+# Tasks execute one after another
+crew = Crew(
+    agents=[agent1, agent2],
+    tasks=[task1, task2],
+    process=Process.sequential,
+)
+```
+
+```python Hierarchical
+# Tasks are delegated based on agent hierarchy
+crew = Crew(
+    agents=[manager, worker1, worker2],
+    tasks=[task1, task2],
+    process=Process.hierarchical,
+    manager_llm=ChatOpenAI(model="gpt-4"),
+)
+```
+</CodeGroup>
+
+## Crew Collaboration
+
+Agents can collaborate on complex tasks:
+
+```python
+research_task = Task(
+    description="Research the latest AI trends in email automation",
+    expected_output="A detailed report on AI email automation trends",
+    agent=researcher_agent,
+)
+
+write_task = Task(
+    description="Write an email summary based on the research",
+    expected_output="A professional email summarizing the findings",
+    agent=writer_agent,
+    context=[research_task],  # Uses output from research_task
+)
+
+send_task = Task(
+    description="Send the email to the team",
+    expected_output="Confirmation that email was sent",
+    agent=email_agent,
+    context=[write_task],  # Uses output from write_task
+)
+
+crew = Crew(
+    agents=[researcher_agent, writer_agent, email_agent],
+    tasks=[research_task, write_task, send_task],
+    process=Process.sequential,
+)
+```
+
+## Custom MCP Configuration
+
+Configure MCP servers with advanced options:
+
+```python
+mcp_server = MCPServerHTTP(
+    url=session.mcp.url,
+    headers=session.mcp.headers,
+    timeout=30,  # Request timeout in seconds
+    retry_attempts=3,  # Number of retry attempts
+)
+```
+
+## Error Handling
+
+```python
+try:
+    crew = Crew(
+        agents=[agent],
+        tasks=[task],
+        verbose=True,
+    )
+    result = crew.kickoff()
+    print(f"Success: {result}")
+except Exception as e:
+    print(f"Crew execution failed: {e}")
+    # Handle errors (e.g., authentication, network issues)
+```
+
+## Best Practices
+
+<Check>**Specific Roles**: Give agents clear, specific roles to improve task execution quality</Check>
+
+<Check>**Clear Expected Outputs**: Define precise expected outputs to guide agent behavior</Check>
+
+<Check>**Task Dependencies**: Use `context` parameter to create task dependencies when needed</Check>
+
+<Check>**Verbose Mode**: Enable verbose mode during development to understand agent decisions</Check>
+
+## Advanced Features
+
+<AccordionGroup>
+  <Accordion title="Memory and Learning">
+    CrewAI agents can maintain memory across executions:
+    
+    ```python
+    agent = Agent(
+        role="Email Specialist",
+        goal="Manage emails",
+        backstory="Expert email manager",
+        mcps=[mcp_server],
+        memory=True,  # Enable memory
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Custom Tools">
+    Combine Composio tools with custom CrewAI tools:
+    
+    ```python
+    from crewai_tools import tool
+    
+    @tool
+    def custom_analysis(text: str) -> str:
+        """Perform custom text analysis"""
+        return f"Analyzed: {text}"
+    
+    agent = Agent(
+        role="Analyst",
+        goal="Analyze data",
+        backstory="Data expert",
+        mcps=[mcp_server],
+        tools=[custom_analysis],
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Callbacks">
+    Monitor crew execution with callbacks:
+    
+    ```python
+    def step_callback(output):
+        print(f"Step completed: {output}")
+    
+    crew = Crew(
+        agents=[agent],
+        tasks=[task],
+        step_callback=step_callback,
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom Tools" icon="wrench" href="/examples/python/custom-tools">
+    Create custom Python tools for CrewAI
+  </Card>
+  <Card title="LangChain Example" icon="link" href="/examples/python/langchain">
+    Use Composio with LangChain
+  </Card>
+</CardGroup>

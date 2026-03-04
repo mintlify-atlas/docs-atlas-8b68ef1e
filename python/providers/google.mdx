@@ -1,0 +1,23 @@
+---
+title: Google AI Provider
+description: Use Composio tools with Google AI
+---
+
+## Installation
+
+```bash
+pip install composio-google google-generativeai
+```
+
+## Usage
+
+```python
+from composio_google import GoogleProvider
+from composio import Composio
+
+composio = Composio(provider=GoogleProvider())
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with Google AI
+# ...
+```

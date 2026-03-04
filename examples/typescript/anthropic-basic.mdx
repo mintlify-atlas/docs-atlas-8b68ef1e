@@ -1,0 +1,210 @@
+---
+title: Anthropic Basic Example
+description: Learn how to use Composio with Anthropic Claude to execute tools with prompt caching
+---
+
+This example demonstrates how to integrate Composio tools with Anthropic's Claude API, including support for prompt caching to improve performance and reduce costs.
+
+## Overview
+
+In this example, you'll learn how to:
+- Initialize Composio with the Anthropic provider
+- Use prompt caching for better performance
+- Handle tool calls with Claude
+- Process multi-turn conversations with tool results
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install @composio/core @composio/anthropic @anthropic-ai/sdk dotenv
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Create a `.env` file with your API keys:
+    ```bash
+    COMPOSIO_API_KEY=your_composio_api_key
+    ANTHROPIC_API_KEY=your_anthropic_api_key
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { AnthropicProvider } from '@composio/anthropic';
+import Anthropic from '@anthropic-ai/sdk';
+import 'dotenv/config';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+/**
+ * Initialize Composio with the Anthropic provider
+ */
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  provider: new AnthropicProvider({ cacheTools: true }),
+});
+
+async function main() {
+  try {
+    console.log('🔄 Fetching tools from Composio...');
+    /**
+     * Get the Hacker News user tool
+     * This tool is automatically wrapped with the Anthropic provider format
+     */
+    const tools = await composio.tools.get('default', 'HACKERNEWS_GET_USER');
+    console.log(`✅ Fetched ${tools.length} tools`);
+
+    console.log('🔄 Creating message with Anthropic...');
+    const messages: Anthropic.Messages.MessageParam[] = [
+      {
+        role: 'user',
+        content: "Fetch the details of the user 'pg' from Hacker News and summarize their profile",
+      },
+    ];
+    
+    /**
+     * Create a message with Anthropic that may use tools
+     */
+    const message = await anthropic.messages.create({
+      model: 'claude-3-7-sonnet-latest',
+      max_tokens: 1024,
+      tools: tools,
+      messages,
+    });
+    
+    messages.push({
+      role: 'assistant',
+      content: message.content,
+    });
+
+    console.log('✅ Message created, processing tool calls if any...');
+
+    /**
+     * Extract tool use blocks from the message content
+     */
+    const toolUseBlocks = message.content.filter(content => content.type === 'tool_use');
+
+    if (toolUseBlocks.length > 0) {
+      console.log(`✅ Found ${toolUseBlocks.length} tool calls`);
+
+      /**
+       * Execute the tool calls using Composio
+       */
+      const toolResults = await composio.provider.handleToolCalls('default', message);
+      messages.push(...toolResults);
+
+      console.log('✅ Tool results:', messages);
+
+      /**
+       * Send a follow-up message with the tool results
+       */
+      const followUpMessage = await anthropic.messages.create({
+        model: 'claude-3-7-sonnet-latest',
+        max_tokens: 1024,
+        messages,
+      });
+
+      /**
+       * Extract the text response from the follow-up message
+       */
+      console.log('🔄 Extracting the text response from the follow-up message...');
+      const finalResponse = followUpMessage.content
+        .filter(content => content.type === 'text')
+        .map(content => content.text)
+        .join('\n');
+
+      console.log('✅ Final response:');
+      console.log(finalResponse);
+    } else {
+      /**
+       * If no tool calls were made, just show the text response
+       */
+      const response = message.content
+        .filter(content => content.type === 'text')
+        .map(content => content.text)
+        .join('\n');
+
+      console.log('❌ Response (no tool calls):');
+      console.log(response);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+
+main();
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Initialize with Anthropic Provider">
+    We initialize Composio with the `AnthropicProvider`, enabling prompt caching with `cacheTools: true`. This reduces latency and costs for repeated tool definitions.
+  </Step>
+
+  <Step title="Fetch and Format Tools">
+    The tools are automatically formatted to match Anthropic's tool calling format, including the proper schema structure.
+  </Step>
+
+  <Step title="First Message with Tools">
+    We send the initial message to Claude along with the available tools. Claude analyzes the request and decides whether to use any tools.
+  </Step>
+
+  <Step title="Execute Tool Calls">
+    If Claude decides to use a tool, we extract the tool use blocks and execute them using Composio's `handleToolCalls` method.
+  </Step>
+
+  <Step title="Follow-up Message">
+    We send the tool results back to Claude in a follow-up message, allowing it to generate a final response based on the data.
+  </Step>
+</Steps>
+
+## Expected Output
+
+```bash
+🔄 Fetching tools from Composio...
+✅ Fetched 1 tools
+🔄 Creating message with Anthropic...
+✅ Message created, processing tool calls if any...
+✅ Found 1 tool calls
+✅ Tool results: [...]
+🔄 Extracting the text response from the follow-up message...
+✅ Final response:
+Based on the HackerNews profile for user 'pg' (Paul Graham), here's a summary:
+
+Paul Graham is a highly influential figure in the tech community with over 150,000 karma points...
+```
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Prompt Caching">
+    The `cacheTools: true` option enables Anthropic's prompt caching feature, which caches tool definitions between requests. This significantly reduces latency and API costs for repeated tool usage.
+  </Accordion>
+
+  <Accordion title="Multi-turn Conversations">
+    The example demonstrates how to handle multi-turn conversations where tool results are fed back to Claude for final processing.
+  </Accordion>
+
+  <Accordion title="Automatic Tool Formatting">
+    Composio automatically converts tool schemas to Anthropic's expected format, handling all the complexity of tool definition conversion.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="LangChain Integration" icon="link" href="/examples/typescript/langchain">
+    Build agent workflows with LangChain
+  </Card>
+  <Card title="File Handling" icon="file" href="/examples/typescript/file-handling">
+    Work with file attachments in tools
+  </Card>
+</CardGroup>

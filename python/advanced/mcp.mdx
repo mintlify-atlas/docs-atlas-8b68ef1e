@@ -1,0 +1,205 @@
+---
+title: MCP (Model Context Protocol)
+description: Create MCP servers for Claude, Cursor, and other MCP-compatible tools
+---
+
+MCP (Model Context Protocol) allows you to create servers that expose Composio tools to MCP-compatible clients like Claude Desktop and Cursor.
+
+## Quick Start
+
+```python
+from composio import Composio
+
+composio = Composio()
+
+# Create MCP server
+server = composio.mcp.create(
+    name="my-mcp-server",
+    toolkits=["github", "gmail"],
+    allowed_tools=["GITHUB_CREATE_ISSUE", "GMAIL_SEND_EMAIL"]
+)
+
+# Generate server instance for a user
+instance = server.generate("user_123")
+print(f"MCP URL: {instance['url']}")
+print(f"Tools: {instance['allowed_tools']}")
+```
+
+## Creating MCP Servers
+
+### Basic Server
+
+```python
+server = composio.mcp.create(
+    name="github-server",
+    toolkits=["github"]
+)
+```
+
+### With Specific Tools
+
+```python
+server = composio.mcp.create(
+    name="productivity-server",
+    toolkits=["github", "slack", "gmail"],
+    allowed_tools=[
+        "GITHUB_CREATE_ISSUE",
+        "SLACK_SEND_MESSAGE",
+        "GMAIL_SEND_EMAIL"
+    ]
+)
+```
+
+### With Auth Configs
+
+```python
+server = composio.mcp.create(
+    name="custom-auth-server",
+    toolkits=[
+        {"toolkit": "github", "auth_config_id": "ac_xxx"},
+        {"toolkit": "slack", "auth_config_id": "ac_yyy"}
+    ],
+    allowed_tools=["GITHUB_CREATE_ISSUE", "SLACK_SEND_MESSAGE"]
+)
+```
+
+### Manual Connection Management
+
+```python
+server = composio.mcp.create(
+    name="manual-server",
+    toolkits=["github"],
+    manually_manage_connections=True
+)
+```
+
+## Managing MCP Servers
+
+### List Servers
+
+```python
+servers = composio.mcp.list(
+    page_no=1,
+    limit=10,
+    toolkits="github"
+)
+
+for server in servers.items:
+    print(f"{server['name']}: {server['id']}")
+```
+
+### Get Server
+
+```python
+server = composio.mcp.get("mcp_xxx")
+
+print(f"Name: {server['name']}")
+print(f"Toolkits: {server['toolkits']}")
+print(f"Tools: {server['allowed_tools']}")
+print(f"Instances: {server['server_instance_count']}")
+```
+
+### Update Server
+
+```python
+updated = composio.mcp.update(
+    "mcp_xxx",
+    name="Updated Server",
+    allowed_tools=["GITHUB_CREATE_ISSUE", "GITHUB_LIST_REPOS"]
+)
+```
+
+### Delete Server
+
+```python
+result = composio.mcp.delete("mcp_xxx")
+print(f"Deleted: {result['deleted']}")
+```
+
+## Generating Server Instances
+
+### For a User
+
+```python
+instance = composio.mcp.generate(
+    user_id="user_123",
+    mcp_config_id="mcp_xxx"
+)
+
+print(f"URL: {instance['url']}")
+print(f"User: {instance['user_id']}")
+print(f"Tools: {instance['allowed_tools']}")
+```
+
+### Using server.generate()
+
+```python
+server = composio.mcp.create(
+    name="my-server",
+    toolkits=["github"]
+)
+
+# Generate for user
+instance = server.generate("user_123")
+print(f"MCP URL: {instance['url']}")
+```
+
+## Using with Claude Desktop
+
+1. Create an MCP server:
+```python
+server = composio.mcp.create(
+    name="claude-tools",
+    toolkits=["github", "gmail", "slack"]
+)
+```
+
+2. Generate instance for user:
+```python
+instance = server.generate("user_123")
+```
+
+3. Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "composio": {
+      "url": "<instance['url']>",
+      "headers": {
+        "x-api-key": "your-composio-api-key"
+      }
+    }
+  }
+}
+```
+
+## Complete Example
+
+```python
+from composio import Composio
+
+composio = Composio()
+
+# Create server with multiple toolkits
+server = composio.mcp.create(
+    name="productivity-suite",
+    toolkits=["github", "gmail", "slack"],
+    allowed_tools=[
+        "GITHUB_CREATE_ISSUE",
+        "GMAIL_SEND_EMAIL",
+        "SLACK_SEND_MESSAGE"
+    ],
+    manually_manage_connections=False
+)
+
+print(f"Server created: {server.id}")
+
+# Generate instances for users
+for user_id in ["user_1", "user_2", "user_3"]:
+    instance = server.generate(user_id)
+    print(f"User {user_id}: {instance['url']}")
+
+# List all servers
+servers = composio.mcp.list()
+print(f"Total servers: {len(servers.items)}")
+```

@@ -1,0 +1,41 @@
+---
+title: LangChain Provider
+description: Use Composio tools with LangChain
+---
+
+## Installation
+
+```bash
+pip install composio-langchain langchain-openai
+```
+
+## Quick Start
+
+```python
+from composio_langchain import LangchainProvider
+from composio import Composio
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_openai_functions_agent, AgentExecutor
+from langchain.prompts import ChatPromptTemplate
+
+# Initialize
+composio = Composio(provider=LangchainProvider())
+llm = ChatOpenAI(model="gpt-4o")
+
+# Get tools
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Create agent
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    ("user", "{input}"),
+    ("assistant", "{agent_scratchpad}")
+])
+
+agent = create_openai_functions_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools)
+
+# Execute
+result = agent_executor.invoke({"input": "Star the composio repository"})
+print(result)
+```

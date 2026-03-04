@@ -1,0 +1,251 @@
+---
+title: OpenAI Agents Provider
+description: Use Composio tools with OpenAI Agents SDK (Swarm)
+---
+
+The OpenAI Agents provider integrates Composio tools with OpenAI's Agents SDK (formerly Swarm), enabling multi-agent workflows with tool access.
+
+## Installation
+
+```bash
+npm install @composio/openai-agents openai
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { OpenAIAgentsProvider } from '@composio/openai-agents';
+import { Agent, Swarm } from '@openai/agents-sdk';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new OpenAIAgentsProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const agent = new Agent({
+  name: 'GitHub Agent',
+  instructions: 'You help users manage their GitHub repositories',
+  tools
+});
+
+const swarm = new Swarm();
+const result = await swarm.run({
+  agent,
+  messages: [{ role: 'user', content: 'Create a new issue' }]
+});
+```
+
+## Multi-Agent Workflows
+
+```typescript
+import { Agent, Swarm } from '@openai/agents-sdk';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new OpenAIAgentsProvider()
+});
+
+// Get tools for different agents
+const githubTools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const slackTools = await composio.tools.get('default', {
+  toolkits: ['slack']
+});
+
+// Create specialized agents
+const githubAgent = new Agent({
+  name: 'GitHub Expert',
+  instructions: 'Manage GitHub repositories and issues',
+  tools: githubTools
+});
+
+const slackAgent = new Agent({
+  name: 'Slack Expert',
+  instructions: 'Send messages and manage Slack channels',
+  tools: slackTools
+});
+
+// Coordinator agent
+const coordinator = new Agent({
+  name: 'Coordinator',
+  instructions: `
+    You coordinate between GitHub and Slack agents.
+    - For GitHub tasks, hand off to GitHub Expert
+    - For Slack tasks, hand off to Slack Expert
+  `,
+  tools: []
+});
+
+// Run the swarm
+const swarm = new Swarm();
+const result = await swarm.run({
+  agent: coordinator,
+  messages: [
+    { 
+      role: 'user', 
+      content: 'Create a GitHub issue and notify the team in Slack' 
+    }
+  ]
+});
+```
+
+## Agent Handoffs
+
+```typescript
+const salesAgent = new Agent({
+  name: 'Sales Agent',
+  instructions: 'Handle sales inquiries',
+  tools: await composio.tools.get('default', {
+    toolkits: ['salesforce']
+  })
+});
+
+const supportAgent = new Agent({
+  name: 'Support Agent', 
+  instructions: 'Handle support requests',
+  tools: await composio.tools.get('default', {
+    toolkits: ['zendesk']
+  })
+});
+
+const router = new Agent({
+  name: 'Router',
+  instructions: `
+    Route conversations:
+    - Sales topics → Sales Agent
+    - Support topics → Support Agent
+  `,
+  tools: [],
+  functions: [
+    {
+      agent: salesAgent,
+      handoff_condition: 'sales or pricing inquiry'
+    },
+    {
+      agent: supportAgent,
+      handoff_condition: 'support or technical issue'
+    }
+  ]
+});
+
+const swarm = new Swarm();
+const result = await swarm.run({
+  agent: router,
+  messages: [
+    { role: 'user', content: 'I need help with my account' }
+  ]
+});
+```
+
+## Context Variables
+
+Share context between agents:
+
+```typescript
+const agent = new Agent({
+  name: 'GitHub Agent',
+  instructions: 'Manage GitHub for user: {username}',
+  tools: githubTools
+});
+
+const swarm = new Swarm();
+const result = await swarm.run({
+  agent,
+  messages: [{ role: 'user', content: 'Show my repos' }],
+  context_variables: {
+    username: 'octocat',
+    repo: 'hello-world'
+  }
+});
+```
+
+## Streaming
+
+```typescript
+const swarm = new Swarm();
+const stream = swarm.run({
+  agent,
+  messages,
+  stream: true
+});
+
+for await (const chunk of stream) {
+  if (chunk.delta) {
+    process.stdout.write(chunk.delta);
+  }
+  
+  if (chunk.tool_calls) {
+    console.log('Tool executed:', chunk.tool_calls);
+  }
+}
+```
+
+## Error Handling
+
+```typescript
+const agent = new Agent({
+  name: 'Resilient Agent',
+  instructions: 'Handle errors gracefully',
+  tools,
+  on_error: async (error) => {
+    console.error('Agent error:', error);
+    return {
+      role: 'assistant',
+      content: 'I encountered an error. Let me try a different approach.'
+    };
+  }
+});
+```
+
+## Best Practices
+
+1. **Agent Specialization**: Create focused agents for specific domains
+2. **Clear Instructions**: Write explicit agent instructions
+3. **Tool Scoping**: Limit tools to what each agent needs
+4. **Context Management**: Use context variables for shared state
+5. **Error Recovery**: Implement error handling in agents
+
+## TypeScript Types
+
+```typescript
+import type { Agent, Swarm } from '@openai/agents-sdk';
+
+// Agent with Composio tools
+interface AgentWithTools extends Agent {
+  tools: ReturnType<typeof composio.tools.get>;
+}
+```
+
+## Differences from OpenAI Provider
+
+| Feature | OpenAI Provider | OpenAI Agents Provider |
+|---------|----------------|------------------------|
+| Tool Execution | Manual | Automatic |
+| Multi-Agent | No | Yes |
+| Handoffs | No | Yes |
+| Context Sharing | No | Yes |
+| Streaming | Manual | Built-in |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Provider" icon="brain" href="/typescript/providers/openai">
+    Standard OpenAI integration
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up user authentication
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View example code
+  </Card>
+</CardGroup>

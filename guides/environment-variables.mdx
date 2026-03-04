@@ -1,0 +1,538 @@
+---
+title: Environment Variables
+description: Configure Composio SDK behavior using environment variables
+---
+
+## Overview
+
+Composio SDK can be configured using environment variables, allowing you to manage settings across different environments (development, staging, production) without changing code.
+
+## Core Environment Variables
+
+### COMPOSIO_API_KEY
+
+Your Composio API key for authentication.
+
+```bash
+COMPOSIO_API_KEY=your_api_key_here
+```
+
+**Usage:**
+
+<CodeGroup>
+```typescript TypeScript
+import { Composio } from 'composio-core';
+
+// Automatically reads from process.env.COMPOSIO_API_KEY
+const composio = new Composio();
+
+// Or explicitly provide it
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+```
+
+```python Python
+from composio import Composio
+import os
+
+# Automatically reads from environment
+composio = Composio()
+
+# Or explicitly provide it
+composio = Composio(api_key=os.environ["COMPOSIO_API_KEY"])
+```
+</CodeGroup>
+
+<Warning>
+  Never commit your API key to version control. Use a `.env` file and add it to `.gitignore`.
+</Warning>
+
+### COMPOSIO_BASE_URL
+
+Custom API base URL for self-hosted or regional deployments.
+
+```bash
+COMPOSIO_BASE_URL=https://api.composio.dev
+```
+
+**Default:** `https://backend.composio.dev`
+
+**Usage:**
+
+```typescript
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  baseUrl: process.env.COMPOSIO_BASE_URL
+});
+```
+
+### COMPOSIO_LOG_LEVEL
+
+Control the verbosity of SDK logs.
+
+```bash
+COMPOSIO_LOG_LEVEL=debug
+```
+
+**Options:** `silent`, `error`, `warn`, `info`, `debug`
+
+**Default:** `info`
+
+**Usage:**
+
+```typescript
+// Logs will automatically use the configured level
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+
+// Override programmatically
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  logLevel: 'debug'
+});
+```
+
+**Log Level Comparison:**
+
+| Level   | Errors | Warnings | Info | Debug |
+|---------|--------|----------|------|-------|
+| silent  | ✗      | ✗        | ✗    | ✗     |
+| error   | ✓      | ✗        | ✗    | ✗     |
+| warn    | ✓      | ✓        | ✗    | ✗     |
+| info    | ✓      | ✓        | ✓    | ✗     |
+| debug   | ✓      | ✓        | ✓    | ✓     |
+
+### COMPOSIO_DISABLE_TELEMETRY
+
+Disable anonymous usage telemetry.
+
+```bash
+COMPOSIO_DISABLE_TELEMETRY=true
+```
+
+**Options:** `true`, `false`
+
+**Default:** `false`
+
+**Usage:**
+
+```typescript
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  disableTelemetry: process.env.COMPOSIO_DISABLE_TELEMETRY === 'true'
+});
+```
+
+## Toolkit Version Variables
+
+Set specific versions for toolkits to ensure consistent behavior across deployments.
+
+### Format
+
+```bash
+COMPOSIO_TOOLKIT_VERSION_<TOOLKIT_SLUG>=<version>
+```
+
+### Examples
+
+```bash
+# Pin GitHub toolkit to specific version
+COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00
+
+# Pin Slack toolkit
+COMPOSIO_TOOLKIT_VERSION_SLACK=20250801_00
+
+# Pin Gmail toolkit
+COMPOSIO_TOOLKIT_VERSION_GMAIL=20250715_00
+```
+
+### Usage
+
+```typescript
+import { Composio } from 'composio-core';
+
+// Toolkit versions are automatically read from environment
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+  // toolkitVersions are automatically loaded from COMPOSIO_TOOLKIT_VERSION_* vars
+});
+
+// Execute tools with automatic version from environment
+const result = await composio.tools.execute('GITHUB_GET_REPOS', {
+  userId: 'user_123',
+  // Version automatically uses COMPOSIO_TOOLKIT_VERSION_GITHUB
+  arguments: { owner: 'composio' }
+});
+```
+
+### Override in Code
+
+```typescript
+// Override environment variables with explicit config
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY,
+  toolkitVersions: {
+    github: '20250909_00',  // Overrides COMPOSIO_TOOLKIT_VERSION_GITHUB
+    slack: '20250801_00'     // Overrides COMPOSIO_TOOLKIT_VERSION_SLACK
+  }
+});
+```
+
+## Development vs Production
+
+### Development Environment
+
+```bash
+# .env.development
+COMPOSIO_API_KEY=your_dev_api_key
+COMPOSIO_BASE_URL=https://backend.composio.dev
+COMPOSIO_LOG_LEVEL=debug
+COMPOSIO_DISABLE_TELEMETRY=true
+COMPOSIO_TOOLKIT_VERSION_GITHUB=latest
+```
+
+### Production Environment
+
+```bash
+# .env.production
+COMPOSIO_API_KEY=your_prod_api_key
+COMPOSIO_BASE_URL=https://backend.composio.dev
+COMPOSIO_LOG_LEVEL=error
+COMPOSIO_DISABLE_TELEMETRY=false
+COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00
+COMPOSIO_TOOLKIT_VERSION_SLACK=20250801_00
+```
+
+## Loading Environment Variables
+
+### Using dotenv (Node.js)
+
+```bash
+npm install dotenv
+```
+
+```typescript
+// Load as early as possible in your app
+import 'dotenv/config';
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+```
+
+### Multiple Environment Files
+
+```typescript
+import { config } from 'dotenv';
+import path from 'path';
+
+// Load environment-specific file
+const env = process.env.NODE_ENV || 'development';
+config({ path: path.resolve(process.cwd(), `.env.${env}`) });
+
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+```
+
+### Vercel/Next.js
+
+```javascript
+// next.config.js
+module.exports = {
+  env: {
+    COMPOSIO_API_KEY: process.env.COMPOSIO_API_KEY,
+    COMPOSIO_BASE_URL: process.env.COMPOSIO_BASE_URL,
+  }
+};
+```
+
+```typescript
+// In your Next.js app
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+```
+
+### Docker
+
+```dockerfile
+# Dockerfile
+FROM node:18
+
+# Environment variables
+ENV COMPOSIO_LOG_LEVEL=info
+ENV COMPOSIO_DISABLE_TELEMETRY=false
+
+WORKDIR /app
+COPY . .
+RUN npm install
+
+CMD ["npm", "start"]
+```
+
+```bash
+# docker-compose.yml
+version: '3.8'
+services:
+  app:
+    build: .
+    environment:
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+      - COMPOSIO_BASE_URL=${COMPOSIO_BASE_URL}
+      - COMPOSIO_LOG_LEVEL=debug
+      - COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00
+    env_file:
+      - .env.production
+```
+
+### Kubernetes
+
+```yaml
+# deployment.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: composio-secrets
+type: Opaque
+stringData:
+  api-key: your_api_key_here
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    spec:
+      containers:
+      - name: app
+        image: my-app:latest
+        env:
+        - name: COMPOSIO_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: composio-secrets
+              key: api-key
+        - name: COMPOSIO_LOG_LEVEL
+          value: "info"
+        - name: COMPOSIO_TOOLKIT_VERSION_GITHUB
+          value: "20250909_00"
+```
+
+## Environment Variable Validation
+
+Validate required environment variables at startup:
+
+```typescript
+function validateEnvironment() {
+  const required = ['COMPOSIO_API_KEY'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`
+    );
+  }
+  
+  // Validate log level
+  const validLogLevels = ['silent', 'error', 'warn', 'info', 'debug'];
+  const logLevel = process.env.COMPOSIO_LOG_LEVEL;
+  if (logLevel && !validLogLevels.includes(logLevel)) {
+    throw new Error(
+      `Invalid COMPOSIO_LOG_LEVEL: ${logLevel}. Must be one of: ${validLogLevels.join(', ')}`
+    );
+  }
+}
+
+// Call before initializing SDK
+validateEnvironment();
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!
+});
+```
+
+## Type-Safe Environment Variables
+
+Use TypeScript for type safety:
+
+```typescript
+// env.d.ts
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      COMPOSIO_API_KEY: string;
+      COMPOSIO_BASE_URL?: string;
+      COMPOSIO_LOG_LEVEL?: 'silent' | 'error' | 'warn' | 'info' | 'debug';
+      COMPOSIO_DISABLE_TELEMETRY?: 'true' | 'false';
+      COMPOSIO_TOOLKIT_VERSION_GITHUB?: string;
+      COMPOSIO_TOOLKIT_VERSION_SLACK?: string;
+      NODE_ENV: 'development' | 'production' | 'test';
+    }
+  }
+}
+
+export {};
+```
+
+```typescript
+// Now TypeScript will enforce types
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY, // Type: string
+  logLevel: process.env.COMPOSIO_LOG_LEVEL // Type: 'silent' | 'error' | 'warn' | 'info' | 'debug'
+});
+```
+
+## Environment Configuration Helper
+
+```typescript
+// config.ts
+import { z } from 'zod';
+
+const envSchema = z.object({
+  COMPOSIO_API_KEY: z.string().min(1, 'COMPOSIO_API_KEY is required'),
+  COMPOSIO_BASE_URL: z.string().url().optional(),
+  COMPOSIO_LOG_LEVEL: z.enum(['silent', 'error', 'warn', 'info', 'debug']).optional(),
+  COMPOSIO_DISABLE_TELEMETRY: z.enum(['true', 'false']).optional(),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development')
+});
+
+export const env = envSchema.parse(process.env);
+
+export function getComposioConfig() {
+  return {
+    apiKey: env.COMPOSIO_API_KEY,
+    baseUrl: env.COMPOSIO_BASE_URL,
+    logLevel: env.COMPOSIO_LOG_LEVEL,
+    disableTelemetry: env.COMPOSIO_DISABLE_TELEMETRY === 'true'
+  };
+}
+```
+
+```typescript
+// app.ts
+import { Composio } from 'composio-core';
+import { getComposioConfig } from './config';
+
+const composio = new Composio(getComposioConfig());
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Never Commit Secrets" icon="lock">
+    Add `.env` files to `.gitignore` and use secret management for production.
+  </Card>
+  
+  <Card title="Use Specific Versions" icon="tag">
+    Pin toolkit versions in production to prevent breaking changes.
+  </Card>
+  
+  <Card title="Validate Early" icon="check">
+    Validate environment variables at application startup to fail fast.
+  </Card>
+  
+  <Card title="Document Variables" icon="book">
+    Maintain a `.env.example` file documenting all environment variables.
+  </Card>
+</CardGroup>
+
+## Example .env.example
+
+```bash
+# .env.example - Copy to .env and fill in your values
+
+# Required: Your Composio API key
+COMPOSIO_API_KEY=
+
+# Optional: Custom API base URL (defaults to https://backend.composio.dev)
+# COMPOSIO_BASE_URL=https://backend.composio.dev
+
+# Optional: Log level (silent, error, warn, info, debug)
+# COMPOSIO_LOG_LEVEL=info
+
+# Optional: Disable telemetry (true or false)
+# COMPOSIO_DISABLE_TELEMETRY=false
+
+# Optional: Toolkit versions (format: COMPOSIO_TOOLKIT_VERSION_<TOOLKIT_SLUG>=<version>)
+# COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00
+# COMPOSIO_TOOLKIT_VERSION_SLACK=20250801_00
+# COMPOSIO_TOOLKIT_VERSION_GMAIL=20250715_00
+
+# Application environment
+# NODE_ENV=development
+```
+
+## Troubleshooting
+
+### Variables Not Loading
+
+```typescript
+// Debug environment variables
+console.log('Environment variables:', {
+  COMPOSIO_API_KEY: process.env.COMPOSIO_API_KEY ? '[SET]' : '[NOT SET]',
+  COMPOSIO_BASE_URL: process.env.COMPOSIO_BASE_URL || '[DEFAULT]',
+  COMPOSIO_LOG_LEVEL: process.env.COMPOSIO_LOG_LEVEL || '[DEFAULT]',
+  NODE_ENV: process.env.NODE_ENV
+});
+
+// Ensure dotenv is loaded before importing Composio
+import 'dotenv/config';
+import { Composio } from 'composio-core';
+```
+
+### Version Not Applied
+
+```bash
+# Ensure environment variable name matches toolkit slug in uppercase
+COMPOSIO_TOOLKIT_VERSION_GITHUB=20250909_00  # Correct
+COMPOSIO_TOOLKIT_VERSION_github=20250909_00  # Wrong - won't work
+```
+
+### Precedence Order
+
+Configuration precedence (highest to lowest):
+
+1. Explicitly passed to SDK constructor
+2. Environment variables
+3. SDK defaults
+
+```typescript
+// Explicit config overrides environment
+const composio = new Composio({
+  apiKey: 'explicit_key', // Overrides COMPOSIO_API_KEY env var
+  toolkitVersions: {
+    github: '20250909_00' // Overrides COMPOSIO_TOOLKIT_VERSION_GITHUB
+  }
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool Execution" icon="play" href="/guides/tool-execution">
+    Use configured toolkit versions in tool execution
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Configure error logging levels
+  </Card>
+  
+  <Card title="Authentication Flows" icon="key" href="/guides/authentication-flows">
+    Set up authentication with environment-based configuration
+  </Card>
+  
+  <Card title="Custom Tools" icon="wrench" href="/guides/custom-tools">
+    Create custom tools with environment-aware settings
+  </Card>
+</CardGroup>

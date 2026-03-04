@@ -1,0 +1,296 @@
+---
+title: Rube MCP Server
+description: Use Rube, Composio's pre-built MCP server, to connect AI tools to 500+ apps with zero configuration
+---
+
+## Overview
+
+[Rube](https://rube.app) is a Model Context Protocol (MCP) server built with Composio that provides instant access to 500+ apps like Gmail, Slack, GitHub, and Notion. It's the fastest way to give your AI tools real-world capabilities without writing any code.
+
+## What is Rube?
+
+Rube is Composio's production-ready MCP server that:
+
+- **Connects to 500+ Apps**: Gmail, Slack, GitHub, Notion, Jira, Linear, and more
+- **Zero Configuration**: Install once, authenticate, and start using immediately
+- **Multi-Client Support**: Works with Cursor, Claude Desktop, VS Code, and any MCP-compatible client
+- **Persistent Authentication**: Authenticate once, use across all your AI clients
+- **Portable**: Your integrations follow you when you switch between clients
+
+## Key Features
+
+### Instant Integration
+
+No need to create and configure MCP servers manually. Rube comes pre-configured with:
+
+- All 500+ Composio toolkits available
+- Optimized tool sets for common workflows
+- Secure authentication management
+- Automatic updates with new tools and integrations
+
+### Seamless Authentication
+
+Rube handles authentication for you:
+
+1. Install Rube in your AI client
+2. Connect your accounts (Gmail, GitHub, etc.) once
+3. Your AI can immediately start performing actions
+4. Credentials are securely stored and never exposed
+
+### Cross-Client Compatibility
+
+Your Rube setup works everywhere:
+
+- **Cursor**: Full IDE integration with AI assistance
+- **Claude Desktop**: Standalone Claude app with tool access
+- **VS Code**: Use with Continue or other extensions
+- **Custom Clients**: Any MCP-compatible application
+
+## Getting Started
+
+### Installation
+
+Visit [rube.app](https://rube.app) to get installation instructions for your AI client.
+
+### Basic Usage
+
+Once installed, simply ask your AI to perform actions:
+
+```
+User: Send an email to john@example.com about the project update
+AI: I'll send that email for you using Gmail.
+[Executes GMAIL_SEND_EMAIL via Rube]
+
+User: Create a GitHub issue for the bug we just discussed
+AI: I'll create that issue in your repository.
+[Executes GITHUB_CREATE_ISSUE via Rube]
+
+User: Add this task to my Notion project board
+AI: I'll add that to your Notion board.
+[Executes NOTION_CREATE_PAGE via Rube]
+```
+
+## Supported Applications
+
+Rube provides access to 500+ applications across categories:
+
+### Communication
+- Gmail
+- Slack
+- Microsoft Teams
+- Discord
+- Telegram
+
+### Development
+- GitHub
+- GitLab
+- Bitbucket
+- Jira
+- Linear
+
+### Productivity
+- Notion
+- Asana
+- Trello
+- Monday.com
+- ClickUp
+
+### And many more...
+
+See the full list at [composio.dev/tools](https://composio.dev/tools)
+
+## Common Use Cases
+
+### Email Management
+
+```
+"Check my unread emails and summarize the important ones"
+"Send a follow-up email to the client about the proposal"
+"Schedule an email to be sent tomorrow morning"
+```
+
+### Code Repository Management
+
+```
+"Create a new branch for the feature I'm working on"
+"Open a pull request with the changes we discussed"
+"Check the status of open issues in the project"
+```
+
+### Project Management
+
+```
+"Create a task in Linear for the bug we found"
+"Update the project status in Notion"
+"Add this to my to-do list in Asana"
+```
+
+### Team Collaboration
+
+```
+"Post a message in the #engineering Slack channel"
+"Schedule a team meeting for next week"
+"Share this document with the design team"
+```
+
+## Building Your Own MCP Server
+
+While Rube is perfect for getting started, you might want to create a custom MCP server for:
+
+- **Specific Tool Sets**: Include only the tools your users need
+- **Custom Authentication**: Implement your own auth flow
+- **White-Label Solutions**: Brand the MCP server for your organization
+- **Advanced Configuration**: Fine-tune tool access and permissions
+
+### Creating a Custom MCP Server
+
+Use Composio's MCP API to create your own server:
+
+```typescript
+import { Composio } from '@composio/core';
+
+const composio = new Composio({ apiKey: 'your-api-key' });
+
+// Create a custom MCP server
+const server = await composio.mcp.create('my-custom-server', {
+  toolkits: ['github', 'slack', 'linear'],
+  allowedTools: [
+    'GITHUB_CREATE_ISSUE',
+    'GITHUB_CREATE_PR',
+    'SLACK_SEND_MESSAGE',
+    'LINEAR_CREATE_ISSUE'
+  ],
+  manuallyManageConnections: false
+});
+
+// Generate instance for a user
+const instance = await server.generate('user@example.com');
+
+console.log('Your MCP server URL:', instance.url);
+```
+
+### Custom Server Setup Commands
+
+After creating your server, get client-specific setup commands:
+
+```typescript
+const server = await composio.mcp.get('your_server_id');
+
+console.log('Claude Desktop:', server.commands.claude);
+console.log('Cursor:', server.commands.cursor);
+console.log('Windsurf:', server.commands.windsurf);
+```
+
+## Rube vs Custom MCP Server
+
+| Feature | Rube | Custom MCP Server |
+|---------|------|-------------------|
+| Setup Time | Instant | 5-10 minutes |
+| Tool Selection | All 500+ tools | Choose specific tools |
+| Authentication | Pre-configured | Customizable |
+| Updates | Automatic | Manual via API |
+| Branding | Composio | Your own |
+| Best For | Getting started, personal use | Production apps, specific workflows |
+
+## Architecture
+
+Rube is built on Composio's MCP infrastructure:
+
+```
+┌─────────────┐
+│  AI Client  │ (Cursor, Claude, VS Code)
+│  (MCP Host) │
+└──────┬──────┘
+       │ MCP Protocol
+       │
+┌──────▼──────┐
+│    Rube     │ Composio MCP Server
+│ MCP Server  │
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│  Composio   │ Tool Execution Engine
+│  Platform   │
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│  External   │ Gmail, GitHub, Slack, etc.
+│    APIs     │
+└─────────────┘
+```
+
+## Security & Privacy
+
+### Authentication
+
+- OAuth-based authentication for all integrations
+- Credentials stored securely by Composio
+- No API keys exposed to AI models
+- Token refresh handled automatically
+
+### Data Privacy
+
+- Only requested data is accessed
+- No data stored beyond execution context
+- User consent required for each integration
+- Full control over connected accounts
+
+### Permissions
+
+- Granular tool-level permissions
+- Revoke access at any time
+- Audit logs for all actions
+- Compliance with SOC 2, GDPR, HIPAA
+
+## Troubleshooting
+
+### Rube Not Responding
+
+1. Check your internet connection
+2. Verify Rube is properly installed in your AI client
+3. Restart your AI client
+4. Check Composio status at [status.composio.dev](https://status.composio.dev)
+
+### Authentication Issues
+
+1. Re-authenticate the affected integration
+2. Check if the app token has expired
+3. Verify app permissions in the connected account
+4. Contact support if the issue persists
+
+### Tool Not Available
+
+1. Confirm the tool exists: [composio.dev/tools](https://composio.dev/tools)
+2. Check if authentication is required
+3. Verify your Composio account has access
+4. Try re-installing Rube
+
+## Support
+
+### Documentation
+
+- [MCP Overview](/mcp/overview)
+- [Available Tools](https://composio.dev/tools)
+- [Authentication Guide](/concepts/authentication)
+
+### Community
+
+- [Discord Community](https://discord.gg/composio)
+- [GitHub Issues](https://github.com/ComposioHQ/composio/issues)
+- [Twitter/X](https://twitter.com/composiohq)
+
+### Enterprise Support
+
+For enterprise deployments and custom requirements:
+
+- Email: [support@composio.dev](mailto:support@composio.dev)
+- Enterprise plans available with SLA
+- Custom MCP server configurations
+- Dedicated support channels
+
+## Next Steps
+
+- Visit [rube.app](https://rube.app) to get started
+- Learn about [MCP architecture](/mcp/overview)
+- Create your own [Custom MCP Server](/mcp/overview#basic-usage)
+- Explore [Composio Toolkits](/concepts/toolkits)

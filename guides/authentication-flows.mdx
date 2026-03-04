@@ -1,0 +1,532 @@
+---
+title: Authentication Flows
+description: Set up and manage authentication for external services in Composio
+---
+
+## Overview
+
+Authentication in Composio allows your users to securely connect their accounts from external services like GitHub, Gmail, Slack, and more. This guide covers different authentication methods, connected account management, and best practices.
+
+## Authentication Concepts
+
+### Key Components
+
+- **Auth Config**: Configuration defining how users authenticate with a service (OAuth2, API Key, etc.)
+- **Connected Account**: A user's authenticated connection to a service
+- **Connection Request**: The process of establishing a new connected account
+- **Toolkit**: A collection of tools for a specific service (e.g., GitHub toolkit)
+
+### Authentication Schemes
+
+Composio supports multiple authentication schemes:
+
+- **OAuth2**: Standard OAuth 2.0 flow (most common)
+- **OAuth1**: OAuth 1.0a for legacy services
+- **API Key**: Simple API key-based authentication
+- **Bearer Token**: Token-based authentication
+- **Basic Auth**: Username and password authentication
+- **No Auth**: Public APIs that don't require authentication
+- **Service Account**: Google Service Accounts and similar
+- **Custom**: Custom authentication schemes
+
+## Creating Connected Accounts
+
+<Steps>
+
+### Step 1: Get or create an auth config
+
+First, obtain an auth config ID for the service you want to connect:
+
+<CodeGroup>
+```typescript TypeScript
+import { Composio } from 'composio-core';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY
+});
+
+// List available auth configs for GitHub
+const authConfigs = await composio.authConfigs.list({
+  toolkit: 'github'
+});
+
+const authConfigId = authConfigs.items[0].id;
+```
+
+```python Python
+from composio import Composio
+
+composio = Composio(api_key=os.environ["COMPOSIO_API_KEY"])
+
+# List available auth configs for GitHub
+auth_configs = composio.auth_configs.list(toolkit='github')
+auth_config_id = auth_configs.items[0].id
+```
+</CodeGroup>
+
+### Step 2: Create a connection link
+
+Generate a connection link for your user:
+
+<CodeGroup>
+```typescript TypeScript
+const connectionRequest = await composio.connectedAccounts.link(
+  'user_123',  // Your user's ID
+  authConfigId,
+  {
+    callbackUrl: 'https://your-app.com/callback'
+  }
+);
+
+console.log('Redirect URL:', connectionRequest.redirectUrl);
+```
+
+```python Python
+connection_request = composio.connected_accounts.link(
+    user_id='user_123',
+    auth_config_id=auth_config_id,
+    callback_url='https://your-app.com/callback'
+)
+
+print('Redirect URL:', connection_request.redirect_url)
+```
+</CodeGroup>
+
+### Step 3: Wait for connection
+
+Wait for the user to complete the authentication:
+
+<CodeGroup>
+```typescript TypeScript
+// Wait for up to 60 seconds (default)
+const connectedAccount = await connectionRequest.waitForConnection();
+
+// Or specify a custom timeout
+const connectedAccount = await connectionRequest.waitForConnection(120000); // 2 minutes
+
+console.log('Connected account ID:', connectedAccount.id);
+console.log('Status:', connectedAccount.status);
+```
+
+```python Python
+# Wait for up to 60 seconds (default)
+connected_account = connection_request.wait_for_connection()
+
+# Or specify a custom timeout
+connected_account = connection_request.wait_for_connection(timeout=120)
+
+print('Connected account ID:', connected_account.id)
+print('Status:', connected_account.status)
+```
+</CodeGroup>
+
+</Steps>
+
+## Direct Authentication (Advanced)
+
+For advanced use cases where you already have user credentials, you can create connected accounts directly:
+
+### OAuth2 Authentication
+
+```typescript
+import { AuthScheme } from 'composio-core';
+
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  authConfigId,
+  {
+    config: AuthScheme.OAuth2({
+      access_token: 'user_oauth_token',
+      token_type: 'Bearer',
+      refresh_token: 'user_refresh_token',
+      expires_in: 3600
+    })
+  }
+);
+
+const connectedAccount = await connectionRequest.waitForConnection();
+```
+
+### API Key Authentication
+
+```typescript
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  authConfigId,
+  {
+    config: AuthScheme.ApiKey({
+      api_key: 'user_api_key'
+    })
+  }
+);
+
+const connectedAccount = await connectionRequest.waitForConnection();
+```
+
+### Basic Authentication
+
+```typescript
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  authConfigId,
+  {
+    config: AuthScheme.Basic({
+      username: 'user@example.com',
+      password: 'secure_password'
+    })
+  }
+);
+
+const connectedAccount = await connectionRequest.waitForConnection();
+```
+
+<Warning>
+  Direct authentication bypasses Composio's managed OAuth flow. Use the `link()` method for OAuth services whenever possible to leverage automatic token refresh and better security.
+</Warning>
+
+## Managing Connected Accounts
+
+### Listing Connected Accounts
+
+```typescript
+// List all connected accounts for a user
+const accounts = await composio.connectedAccounts.list({
+  userIds: ['user_123']
+});
+
+// Filter by toolkit
+const githubAccounts = await composio.connectedAccounts.list({
+  userIds: ['user_123'],
+  toolkitSlugs: ['github']
+});
+
+// Filter by status
+const activeAccounts = await composio.connectedAccounts.list({
+  userIds: ['user_123'],
+  statuses: ['ACTIVE']
+});
+```
+
+### Getting a Specific Account
+
+```typescript
+const account = await composio.connectedAccounts.get('conn_abc123');
+
+console.log('Account:', {
+  id: account.id,
+  status: account.status,
+  toolkit: account.toolkit.slug,
+  userId: account.userId
+});
+```
+
+### Refreshing Credentials
+
+```typescript
+// Refresh OAuth tokens
+const refreshed = await composio.connectedAccounts.refresh('conn_abc123');
+
+// Refresh with redirect URL (for services requiring user interaction)
+const refreshed = await composio.connectedAccounts.refresh('conn_abc123', {
+  redirectUrl: 'https://your-app.com/refresh-callback',
+  validateCredentials: true
+});
+```
+
+### Enabling and Disabling Accounts
+
+```typescript
+// Temporarily disable an account
+await composio.connectedAccounts.disable('conn_abc123');
+
+// Re-enable an account
+await composio.connectedAccounts.enable('conn_abc123');
+
+// Update status with a reason
+await composio.connectedAccounts.updateStatus('conn_abc123', {
+  enabled: false,
+  reason: 'User requested temporary suspension'
+});
+```
+
+### Deleting Connected Accounts
+
+```typescript
+// Permanently delete a connected account
+await composio.connectedAccounts.delete('conn_abc123');
+```
+
+<Warning>
+  Deleting a connected account is permanent and cannot be undone. All associated tokens will be revoked.
+</Warning>
+
+## Multiple Connected Accounts
+
+By default, Composio prevents users from having multiple connected accounts for the same auth config:
+
+```typescript
+// This will throw ComposioMultipleConnectedAccountsError if an account exists
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  authConfigId
+);
+```
+
+To allow multiple accounts, use the `allowMultiple` option:
+
+```typescript
+const connectionRequest = await composio.connectedAccounts.initiate(
+  'user_123',
+  authConfigId,
+  {
+    allowMultiple: true,
+    config: AuthScheme.OAuth2({ /* ... */ })
+  }
+);
+```
+
+## Authentication Error Handling
+
+```typescript
+import {
+  ComposioConnectedAccountNotFoundError,
+  ComposioMultipleConnectedAccountsError,
+  ComposioFailedToCreateConnectedAccountLink,
+  ConnectionRequestFailedError,
+  ConnectionRequestTimeoutError
+} from 'composio-core';
+
+try {
+  const connectionRequest = await composio.connectedAccounts.link(
+    'user_123',
+    authConfigId
+  );
+  
+  const connectedAccount = await connectionRequest.waitForConnection(60000);
+  
+} catch (error) {
+  if (error instanceof ComposioConnectedAccountNotFoundError) {
+    console.error('Connected account not found');
+  } else if (error instanceof ComposioMultipleConnectedAccountsError) {
+    console.error('User already has a connected account. Use allowMultiple option.');
+  } else if (error instanceof ComposioFailedToCreateConnectedAccountLink) {
+    console.error('Failed to create connection link:', error.message);
+  } else if (error instanceof ConnectionRequestTimeoutError) {
+    console.error('User did not complete authentication in time');
+  } else if (error instanceof ConnectionRequestFailedError) {
+    console.error('Authentication failed:', error.message);
+  }
+}
+```
+
+## Connection Request States
+
+Connection requests go through several states:
+
+- **INITIATED**: Connection request created, waiting for user action
+- **ACTIVE**: User completed authentication successfully
+- **FAILED**: Authentication failed
+- **EXPIRED**: Connection link expired before completion
+- **DELETED**: Connection request was cancelled
+
+## Working with Auth Configs
+
+### Listing Auth Configs
+
+```typescript
+// List all auth configs
+const allConfigs = await composio.authConfigs.list();
+
+// List configs for a specific toolkit
+const githubConfigs = await composio.authConfigs.list({
+  toolkit: 'github'
+});
+
+// List only custom (non-Composio-managed) configs
+const customConfigs = await composio.authConfigs.list({
+  isComposioManaged: false
+});
+```
+
+### Getting Auth Config Details
+
+```typescript
+const authConfig = await composio.authConfigs.get(authConfigId);
+
+console.log('Auth Config:', {
+  id: authConfig.id,
+  name: authConfig.name,
+  toolkit: authConfig.toolkit.slug,
+  authScheme: authConfig.authScheme,
+  numberOfConnections: authConfig.noOfConnections,
+  isComposioManaged: authConfig.isComposioManaged
+});
+```
+
+### Creating Custom Auth Configs
+
+```typescript
+import { AuthSchemeTypes } from 'composio-core';
+
+// Create a custom OAuth2 auth config
+const authConfig = await composio.authConfigs.create('github', {
+  type: 'use_custom_auth',
+  name: 'My GitHub App',
+  authScheme: AuthSchemeTypes.OAUTH2,
+  credentials: {
+    client_id: 'your_github_app_client_id',
+    client_secret: 'your_github_app_client_secret',
+    redirect_url: 'https://your-app.com/oauth/callback'
+  }
+});
+
+// Create an API Key auth config
+const apiKeyConfig = await composio.authConfigs.create('custom-api', {
+  type: 'use_custom_auth',
+  name: 'Custom API',
+  authScheme: AuthSchemeTypes.API_KEY,
+  credentials: {
+    api_key_header: 'X-API-Key'
+  }
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Connection Links" icon="link">
+    Prefer the `link()` method over direct authentication for OAuth services to ensure proper token management.
+  </Card>
+  
+  <Card title="Handle Timeouts" icon="clock">
+    Set appropriate timeouts for `waitForConnection()` based on your UX expectations.
+  </Card>
+  
+  <Card title="Refresh Tokens" icon="rotate">
+    Implement token refresh logic for long-running applications to maintain valid credentials.
+  </Card>
+  
+  <Card title="Manage State" icon="database">
+    Store connected account IDs in your database to track user connections.
+  </Card>
+</CardGroup>
+
+## Frontend Integration Example
+
+Here's a complete example of integrating authentication in a React application:
+
+```typescript
+// Backend: Create connection link endpoint
+app.post('/api/connect/:service', async (req, res) => {
+  const { service } = req.params;
+  const userId = req.user.id; // Your user ID
+  
+  // Get auth config for the service
+  const authConfigs = await composio.authConfigs.list({
+    toolkit: service
+  });
+  
+  if (authConfigs.items.length === 0) {
+    return res.status(404).json({ error: 'Service not found' });
+  }
+  
+  // Create connection link
+  const connectionRequest = await composio.connectedAccounts.link(
+    userId,
+    authConfigs.items[0].id,
+    {
+      callbackUrl: `${process.env.APP_URL}/connected`
+    }
+  );
+  
+  res.json({
+    redirectUrl: connectionRequest.redirectUrl,
+    connectionId: connectionRequest.id
+  });
+});
+
+// Backend: Check connection status endpoint
+app.get('/api/connection/:id/status', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const account = await composio.connectedAccounts.get(id);
+    res.json({ status: account.status });
+  } catch (error) {
+    res.status(404).json({ error: 'Connection not found' });
+  }
+});
+```
+
+```tsx
+// Frontend: React component
+import { useState } from 'react';
+
+function ConnectService({ service }: { service: string }) {
+  const [connecting, setConnecting] = useState(false);
+  
+  const handleConnect = async () => {
+    setConnecting(true);
+    
+    try {
+      // Request connection link from backend
+      const response = await fetch(`/api/connect/${service}`, {
+        method: 'POST'
+      });
+      
+      const { redirectUrl, connectionId } = await response.json();
+      
+      // Open OAuth popup
+      const popup = window.open(redirectUrl, 'Connect', 'width=600,height=700');
+      
+      // Poll for connection status
+      const checkStatus = setInterval(async () => {
+        const statusResponse = await fetch(`/api/connection/${connectionId}/status`);
+        const { status } = await statusResponse.json();
+        
+        if (status === 'ACTIVE') {
+          clearInterval(checkStatus);
+          popup?.close();
+          setConnecting(false);
+          // Connection successful!
+        } else if (status === 'FAILED') {
+          clearInterval(checkStatus);
+          popup?.close();
+          setConnecting(false);
+          alert('Connection failed');
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Connection error:', error);
+      setConnecting(false);
+    }
+  };
+  
+  return (
+    <button onClick={handleConnect} disabled={connecting}>
+      {connecting ? 'Connecting...' : `Connect ${service}`}
+    </button>
+  );
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tool Execution" icon="play" href="/guides/tool-execution">
+    Learn how to execute tools with authenticated accounts
+  </Card>
+  
+  <Card title="Custom Tools" icon="wrench" href="/guides/custom-tools">
+    Create custom tools that use connected accounts
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Handle authentication errors gracefully
+  </Card>
+  
+  <Card title="Environment Variables" icon="key" href="/guides/environment-variables">
+    Configure authentication settings via environment variables
+  </Card>
+</CardGroup>

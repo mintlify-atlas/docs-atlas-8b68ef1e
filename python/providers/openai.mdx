@@ -1,0 +1,55 @@
+---
+title: OpenAI Provider
+description: Use Composio tools with OpenAI's API
+---
+
+## Installation
+
+```bash
+pip install composio-openai openai
+```
+
+## Quick Start
+
+```python
+import os
+from composio import Composio
+from composio_openai import OpenAIProvider
+from openai import OpenAI
+
+# Initialize
+composio = Composio(provider=OpenAIProvider())
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Get tools
+tools = composio.tools.get(user_id="default", toolkits=["github"])
+
+# Use with OpenAI
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Star the composiohq/composio repository"}
+    ],
+    tools=tools,
+    tool_choice="auto"
+)
+
+# Handle tool calls
+if response.choices[0].message.tool_calls:
+    result = composio.provider.handle_tool_calls(
+        response=response,
+        user_id="default"
+    )
+    print(result)
+```
+
+## OpenAI Responses Provider
+
+For OpenAI Responses SDK:
+
+```python
+from composio_openai import OpenAIResponsesProvider
+
+composio = Composio(provider=OpenAIResponsesProvider())
+```

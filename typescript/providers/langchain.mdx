@@ -1,0 +1,257 @@
+---
+title: LangChain Provider
+description: Use Composio tools with LangChain.js agents and chains
+---
+
+The LangChain provider wraps Composio tools as DynamicStructuredTools for use with LangChain.js.
+
+## Installation
+
+```bash
+npm install @composio/langchain langchain @langchain/core @langchain/openai
+```
+
+## Quick Start
+
+```typescript
+import { Composio } from '@composio/core';
+import { LangchainProvider } from '@composio/langchain';
+import { ChatOpenAI } from '@langchain/openai';
+import { AgentExecutor, createOpenAIFunctionsAgent } from 'langchain/agents';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+
+const composio = new Composio({
+  apiKey: 'your-composio-key',
+  provider: new LangchainProvider()
+});
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const llm = new ChatOpenAI({ model: 'gpt-4', temperature: 0 });
+
+const prompt = ChatPromptTemplate.fromMessages([
+  ['system', 'You are a helpful assistant'],
+  ['human', '{input}'],
+  ['placeholder', '{agent_scratchpad}']
+]);
+
+const agent = await createOpenAIFunctionsAgent({ llm, tools, prompt });
+
+const executor = new AgentExecutor({ agent, tools });
+
+const result = await executor.invoke({
+  input: 'Create a GitHub issue'
+});
+
+console.log(result.output);
+```
+
+## Complete Example
+
+```typescript
+import { Composio } from '@composio/core';
+import { LangchainProvider } from '@composio/langchain';
+import { ChatOpenAI } from '@langchain/openai';
+import { AgentExecutor, createOpenAIFunctionsAgent } from 'langchain/agents';
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+
+const composio = new Composio({
+  apiKey: process.env.COMPOSIO_API_KEY!,
+  provider: new LangchainProvider()
+});
+
+async function runAgent(userMessage: string) {
+  const tools = await composio.tools.get('default', {
+    toolkits: ['github', 'slack']
+  });
+
+  const llm = new ChatOpenAI({
+    apiKey: process.env.OPENAI_API_KEY!,
+    model: 'gpt-4',
+    temperature: 0
+  });
+
+  const prompt = ChatPromptTemplate.fromMessages([
+    ['system', `You are a helpful assistant that can:
+      - Manage GitHub repositories
+      - Send Slack messages
+      
+      Always explain what you're doing before taking actions.`],
+    ['human', '{input}'],
+    new MessagesPlaceholder('agent_scratchpad')
+  ]);
+
+  const agent = await createOpenAIFunctionsAgent({
+    llm,
+    tools,
+    prompt
+  });
+
+  const executor = new AgentExecutor({
+    agent,
+    tools,
+    verbose: true,
+    maxIterations: 10
+  });
+
+  const result = await executor.invoke({ input: userMessage });
+  return result.output;
+}
+
+const answer = await runAgent(
+  'Create a GitHub issue and notify the team in Slack'
+);
+console.log(answer);
+```
+
+## With Memory
+
+```typescript
+import { BufferMemory } from 'langchain/memory';
+import { ConversationChain } from 'langchain/chains';
+
+const memory = new BufferMemory();
+
+const chain = new ConversationChain({
+  llm,
+  memory,
+  tools
+});
+
+const response1 = await chain.call({
+  input: 'My name is Alice'
+});
+
+const response2 = await chain.call({
+  input: 'What is my name?'
+});
+
+console.log(response2.response); // "Your name is Alice"
+```
+
+## Streaming
+
+```typescript
+const executor = new AgentExecutor({ agent, tools });
+
+const stream = await executor.stream({ input: 'Create an issue' });
+
+for await (const chunk of stream) {
+  if (chunk.output) {
+    console.log(chunk.output);
+  }
+}
+```
+
+## Custom Chains
+
+```typescript
+import { LLMChain } from 'langchain/chains';
+import { PromptTemplate } from '@langchain/core/prompts';
+
+const tools = await composio.tools.get('default', {
+  toolkits: ['github']
+});
+
+const prompt = PromptTemplate.fromTemplate(`
+  Create a GitHub issue with:
+  Title: {title}
+  Description: {description}
+`);
+
+const chain = new LLMChain({
+  llm,
+  prompt,
+  tools
+});
+
+const result = await chain.call({
+  title: 'Bug Report',
+  description: 'Found a critical bug'
+});
+```
+
+## Tool Format
+
+The LangChain provider wraps tools as DynamicStructuredTools:
+
+```typescript
+import { DynamicStructuredTool } from '@langchain/core/tools';
+
+// Each tool is wrapped as:
+const tool = new DynamicStructuredTool({
+  name: 'GITHUB_CREATE_ISSUE',
+  description: 'Create a new GitHub issue',
+  schema: zodSchema, // Zod schema from JSON Schema
+  func: async (input) => {
+    // Executes via Composio
+    return result;
+  }
+});
+```
+
+## Best Practices
+
+1. **Tool Selection**: Limit tools to what the agent needs
+2. **Max Iterations**: Set reasonable iteration limits
+3. **Verbose Mode**: Enable for debugging
+4. **Memory**: Use appropriate memory for conversations
+5. **Error Handling**: Wrap agent calls in try-catch
+
+## Advanced Agents
+
+### React Agent
+
+```typescript
+import { createReactAgent } from 'langchain/agents';
+
+const agent = await createReactAgent({
+  llm,
+  tools,
+  prompt: ChatPromptTemplate.fromMessages([
+    ['system', 'You are a helpful assistant'],
+    ['human', '{input}'],
+    ['placeholder', '{agent_scratchpad}']
+  ])
+});
+```
+
+### Structured Chat Agent
+
+```typescript
+import { createStructuredChatAgent } from 'langchain/agents';
+
+const agent = await createStructuredChatAgent({
+  llm,
+  tools,
+  prompt
+});
+```
+
+## TypeScript Types
+
+```typescript
+import type { DynamicStructuredTool } from '@langchain/core/tools';
+
+// Tool collection type
+type LangChainToolCollection = DynamicStructuredTool[];
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="LlamaIndex Provider" icon="llama" href="/typescript/providers/llamaindex">
+    Alternative agent framework
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/typescript/api/tools">
+    Learn about tools
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/typescript/api/connected-accounts">
+    Set up authentication
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/composioHQ/composio/tree/master/typescript/examples">
+    View examples
+  </Card>
+</CardGroup>

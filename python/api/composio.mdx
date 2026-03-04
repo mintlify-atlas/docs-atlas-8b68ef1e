@@ -1,0 +1,379 @@
+---
+title: Composio Client
+description: Main SDK client for initializing and configuring Composio
+---
+
+The `Composio` class is the main entry point for the Python SDK. It provides access to all SDK features including tools, toolkits, connected accounts, triggers, and more.
+
+## Initialization
+
+### Basic Usage
+
+```python
+from composio import Composio
+import os
+
+# Initialize with API key from environment
+composio = Composio(api_key=os.getenv("COMPOSIO_API_KEY"))
+
+# Or let it auto-detect from COMPOSIO_API_KEY env var
+composio = Composio()
+```
+
+### With Provider
+
+```python
+from composio import Composio
+from composio_openai import OpenAIProvider
+from composio_anthropic import AnthropicProvider
+
+# Initialize with OpenAI provider
+composio = Composio(provider=OpenAIProvider())
+
+# Initialize with Anthropic provider
+composio = Composio(provider=AnthropicProvider())
+```
+
+## Constructor
+
+<ParamField path="provider" type="BaseProvider[TTool, TToolCollection] | None" default="OpenAIProvider()">
+  The provider to use for tool wrapping. Defaults to OpenAI format. The generic types (TTool, TToolCollection) are automatically inferred from the provider.
+</ParamField>
+
+<ParamField path="api_key" type="str" required>
+  Your Composio API key. Can be obtained from the Composio dashboard. If not provided, will read from `COMPOSIO_API_KEY` environment variable.
+</ParamField>
+
+<ParamField path="base_url" type="str" default="https://api.composio.dev">
+  Custom API base URL for enterprise or development environments.
+</ParamField>
+
+<ParamField path="timeout" type="int" default="60">
+  Request timeout in seconds.
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="3">
+  Maximum number of retries for failed requests.
+</ParamField>
+
+<ParamField path="allow_tracking" type="bool" default="True">
+  Enable or disable telemetry tracking.
+</ParamField>
+
+<ParamField path="file_download_dir" type="str" default="./downloads">
+  Directory path for downloading files from tool executions.
+</ParamField>
+
+<ParamField path="toolkit_versions" type="dict[str, str] | str | None" default="None">
+  Specify toolkit versions to use:
+  - Dictionary mapping toolkit names to versions: `{"github": "20250906_01"}`
+  - String for same version across all toolkits: `"20250906_01"`
+  - `None` or `"latest"` for latest versions (default)
+  
+  Can also be set via environment variables: `COMPOSIO_TOOLKIT_VERSION_GITHUB=20250906_01`
+</ParamField>
+
+<ParamField path="auto_upload_download_files" type="bool" default="True">
+  Automatically handle file uploads and downloads in tool executions.
+</ParamField>
+
+## Complete Configuration Example
+
+```python
+from composio import Composio
+from composio_openai import OpenAIProvider
+
+composio = Composio(
+    api_key="your-api-key",
+    base_url="https://api.composio.dev",
+    timeout=90,
+    max_retries=5,
+    allow_tracking=True,
+    file_download_dir="./my-downloads",
+    provider=OpenAIProvider(),
+    toolkit_versions={
+        "github": "20250906_01",
+        "slack": "latest"
+    },
+    auto_upload_download_files=True
+)
+```
+
+## Properties
+
+The Composio client exposes the following properties for accessing SDK functionality:
+
+### tools
+
+<ResponseField name="tools" type="Tools[TTool, TToolCollection]">
+  Access to tool operations. See [Tools API](/python/api/tools) for details.
+  
+  ```python
+  tools = composio.tools.get(user_id="default", toolkits=["github"])
+  result = composio.tools.execute("GITHUB_CREATE_ISSUE", {...})
+  ```
+</ResponseField>
+
+### toolkits
+
+<ResponseField name="toolkits" type="Toolkits">
+  Access to toolkit operations. See [Toolkits API](/python/api/toolkits) for details.
+  
+  ```python
+  toolkit = composio.toolkits.get("github")
+  all_toolkits = composio.toolkits.list()
+  ```
+</ResponseField>
+
+### connected_accounts
+
+<ResponseField name="connected_accounts" type="ConnectedAccounts">
+  Manage third-party service connections. See [Connected Accounts API](/python/api/connected-accounts) for details.
+  
+  ```python
+  connection = composio.connected_accounts.initiate(
+      user_id="user_123",
+      auth_config_id="ac_xxx"
+  )
+  ```
+</ResponseField>
+
+### auth_configs
+
+<ResponseField name="auth_configs" type="AuthConfigs">
+  Manage authentication configurations. See [Auth Configs API](/python/api/auth-configs) for details.
+  
+  ```python
+  config = composio.auth_configs.create("github", {...})
+  ```
+</ResponseField>
+
+### triggers
+
+<ResponseField name="triggers" type="Triggers">
+  Manage event triggers and webhooks. See [Triggers API](/python/api/triggers) for details.
+  
+  ```python
+  subscription = composio.triggers.subscribe()
+  
+  @subscription.handle(trigger_slug="GITHUB_COMMIT_EVENT")
+  def on_commit(event):
+      print(f"New commit: {event['payload']}")
+  ```
+</ResponseField>
+
+### mcp
+
+<ResponseField name="mcp" type="MCP">
+  Model Context Protocol operations. See [MCP API](/python/advanced/mcp) for details.
+  
+  ```python
+  server = composio.mcp.create(
+      "my-server",
+      toolkits=["github", "gmail"]
+  )
+  ```
+</ResponseField>
+
+### tool_router
+
+<ResponseField name="tool_router" type="ToolRouter[TTool, TToolCollection]">
+  Advanced tool routing with session management. See [Tool Router API](/python/advanced/tool-router) for details.
+  
+  ```python
+  session = composio.tool_router.create(
+      user_id="user_123",
+      toolkits=["github"]
+  )
+  ```
+</ResponseField>
+
+### provider
+
+<ResponseField name="provider" type="BaseProvider[TTool, TToolCollection]">
+  The current provider instance used for tool wrapping.
+  
+  ```python
+  # Access provider-specific functionality
+  result = composio.provider.handle_tool_calls(
+      response=openai_response,
+      user_id="default"
+  )
+  ```
+</ResponseField>
+
+### client
+
+<ResponseField name="client" type="HttpClient">
+  The underlying HTTP client for direct API access (advanced usage).
+</ResponseField>
+
+## Generic Type System
+
+The Composio class uses Python generics to provide type safety:
+
+```python
+from composio import Composio
+from composio_openai import OpenAIProvider
+from composio_anthropic import AnthropicProvider
+
+# With OpenAI provider
+composio_openai: Composio[OpenAITool, list[OpenAITool]] = Composio(
+    provider=OpenAIProvider()
+)
+
+# With Anthropic provider  
+composio_anthropic: Composio[ToolParam, list[ToolParam]] = Composio(
+    provider=AnthropicProvider()
+)
+
+# Default (OpenAI)
+composio_default: Composio[OpenAITool, list[OpenAITool]] = Composio()
+```
+
+The generic parameters:
+- `TTool`: Individual tool type (e.g., `OpenAITool`, `ToolParam`)
+- `TToolCollection`: Collection type returned by `get()` (e.g., `list[OpenAITool]`)
+
+## Shorthand Methods
+
+The Composio client provides shorthand methods for common operations:
+
+### create
+
+```python
+# Shorthand for tool_router.create()
+session = composio.create(
+    user_id="user_123",
+    toolkits=["github"]
+)
+```
+
+Equivalent to:
+```python
+session = composio.tool_router.create(
+    user_id="user_123",
+    toolkits=["github"]
+)
+```
+
+### use
+
+```python
+# Shorthand for tool_router.use()
+session = composio.use(session_id="session_123")
+```
+
+Equivalent to:
+```python
+session = composio.tool_router.use(session_id="session_123")
+```
+
+## Environment Variables
+
+The Composio SDK respects these environment variables:
+
+```bash
+# Required
+COMPOSIO_API_KEY=your-api-key
+
+# Optional
+COMPOSIO_BASE_URL=https://api.composio.dev
+COMPOSIO_LOGGING_LEVEL=info  # silent, error, warn, info, debug
+DEVELOPMENT=false
+CI=false
+
+# Toolkit versions (per toolkit)
+COMPOSIO_TOOLKIT_VERSION_GITHUB=20250906_01
+COMPOSIO_TOOLKIT_VERSION_SLACK=latest
+```
+
+## Error Handling
+
+```python
+from composio import Composio
+from composio.exceptions import (
+    ApiKeyNotProvidedError,
+    ComposioError,
+    InvalidParams
+)
+
+try:
+    composio = Composio()  # Will raise if no API key
+except ApiKeyNotProvidedError:
+    print("Please set COMPOSIO_API_KEY environment variable")
+except ComposioError as e:
+    print(f"Composio error: {e}")
+```
+
+## Examples
+
+### Basic Tool Execution
+
+```python
+from composio import Composio
+import os
+
+composio = Composio(api_key=os.getenv("COMPOSIO_API_KEY"))
+
+# Get tools
+tools = composio.tools.get(
+    user_id="default",
+    toolkits=["github"]
+)
+
+# Execute a tool
+result = composio.tools.execute(
+    slug="GITHUB_GET_REPO",
+    arguments={"owner": "composiohq", "repo": "composio"},
+    user_id="default"
+)
+
+print(result)
+```
+
+### With Custom Provider
+
+```python
+from composio import Composio
+from composio_anthropic import AnthropicProvider
+from anthropic import Anthropic
+
+composio = Composio(provider=AnthropicProvider())
+anthropic = Anthropic()
+
+tools = composio.tools.get(
+    user_id="default",
+    toolkits=["github"]
+)
+
+response = anthropic.messages.create(
+    model="claude-3-opus-20240229",
+    max_tokens=1024,
+    tools=tools,
+    messages=[{"role": "user", "content": "Star the composio repo"}]
+)
+
+if response.stop_reason == "tool_use":
+    result = composio.provider.handle_tool_calls(
+        response=response,
+        user_id="default"
+    )
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tools" icon="wrench" href="/python/api/tools">
+    Learn about tool operations
+  </Card>
+  <Card title="Connected Accounts" icon="link" href="/python/api/connected-accounts">
+    Manage user authentication
+  </Card>
+  <Card title="Providers" icon="plug" href="/python/providers/overview">
+    Explore AI framework integrations
+  </Card>
+  <Card title="Tool Router" icon="route" href="/python/advanced/tool-router">
+    Advanced routing features
+  </Card>
+</CardGroup>

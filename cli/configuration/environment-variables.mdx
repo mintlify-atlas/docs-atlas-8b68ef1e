@@ -1,0 +1,384 @@
+---
+title: Environment Variables
+description: Configure the Composio CLI using environment variables
+---
+
+The Composio CLI supports configuration via environment variables for flexible deployment across different environments.
+
+## Configuration Overview
+
+The CLI uses a two-tier configuration system:
+
+1. **Environment variables** - Runtime configuration (highest precedence)
+2. **User config file** - Persistent storage (`~/.composio/user-config.json`)
+
+Environment variables always override values in the user config file.
+
+## Core Configuration
+
+### COMPOSIO_API_KEY
+
+<ParamField path="COMPOSIO_API_KEY" type="string">
+  Your Composio backend API key (starts with `uak_` for user API keys or `ak_` for account keys).
+  
+  **User config key:** `api_key`
+  
+  **Default:** `None`
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_API_KEY="uak_b813ydmoEYdB_xBxGHeW"
+composio generate
+```
+
+<Note>
+  When set, this overrides the API key stored from `composio login`.
+</Note>
+
+### COMPOSIO_BASE_URL
+
+<ParamField path="COMPOSIO_BASE_URL" type="string" default="https://backend.composio.dev">
+  The base URL of the Composio backend API.
+  
+  **User config key:** `base_url`
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_BASE_URL="https://api-staging.composio.dev"
+composio login
+```
+
+Useful for:
+- Testing against staging environments
+- Using a self-hosted Composio instance
+- Development/debugging
+
+### COMPOSIO_WEB_URL
+
+<ParamField path="COMPOSIO_WEB_URL" type="string" default="https://platform.composio.dev">
+  The base URL of the Composio web app (used during login flow).
+  
+  **User config key:** `web_url`
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_WEB_URL="https://app-staging.composio.dev"
+composio login
+```
+
+### COMPOSIO_CACHE_DIR
+
+<ParamField path="COMPOSIO_CACHE_DIR" type="string" default="~/.composio">
+  Directory where the CLI stores cache files and user configuration.
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_CACHE_DIR="/tmp/composio-cache"
+composio generate
+```
+
+Cached files include:
+- `user-config.json` - User authentication and settings
+- `toolkits.json` - Toolkit metadata
+- `tools.json` - Tool definitions
+- `tools-as-enums.json` - Tool name enums
+- `trigger-types.json` - Trigger type definitions
+
+### COMPOSIO_LOG_LEVEL
+
+<ParamField path="COMPOSIO_LOG_LEVEL" type="string">
+  Log verbosity level for the CLI.
+  
+  **Accepted values:** `all`, `trace`, `debug`, `info`, `warning`, `error`, `fatal`, `none`
+  
+  **Default:** `None` (minimal output)
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_LOG_LEVEL="debug"
+composio generate
+```
+
+Or use the global flag:
+
+```bash
+composio --log-level debug generate
+```
+
+<Note>
+  The `--log-level` flag takes precedence over the environment variable.
+</Note>
+
+## Cache Control
+
+### FORCE_USE_CACHE
+
+<ParamField path="FORCE_USE_CACHE" type="boolean">
+  Force the CLI to use cached API responses when available.
+  
+  **Default:** `false`
+</ParamField>
+
+**Example:**
+
+```bash
+export FORCE_USE_CACHE="true"
+composio generate
+```
+
+When enabled:
+- CLI checks cache first before making API calls
+- Works offline if cache is available
+- Useful for CI/CD with pre-warmed cache
+
+**Use cases:**
+
+```bash
+# Warm the cache
+composio generate
+
+# Use cached data (works offline)
+FORCE_USE_CACHE=true composio generate
+```
+
+## Toolkit Version Overrides
+
+### COMPOSIO_TOOLKIT_VERSION_\<TOOLKIT\>
+
+<ParamField path="COMPOSIO_TOOLKIT_VERSION_<TOOLKIT>" type="string">
+  Override the version for a specific toolkit.
+  
+  **Format:** `COMPOSIO_TOOLKIT_VERSION_<TOOLKIT_SLUG>=<version>`
+  
+  **Values:**
+  - Specific version (e.g., `20250901_00`)
+  - `latest` (use the latest available version)
+  - Unset (defaults to `latest`)
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_TOOLKIT_VERSION_GMAIL=20250901_00
+export COMPOSIO_TOOLKIT_VERSION_GITHUB=20241215_00
+export COMPOSIO_TOOLKIT_VERSION_SLACK=latest
+composio generate --type-tools
+```
+
+<Warning>
+  Toolkit version overrides only apply when using `--type-tools` with `composio generate` or `composio ts generate`.
+</Warning>
+
+See [Toolkit Versions](/cli/configuration/toolkit-versions) for more details.
+
+## GitHub Integration (Upgrade)
+
+### COMPOSIO_GITHUB_API_BASE_URL
+
+<ParamField path="COMPOSIO_GITHUB_API_BASE_URL" type="string" default="https://api.github.com">
+  GitHub API base URL for fetching releases.
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_GITHUB_API_BASE_URL="https://github.company.com/api/v3"
+composio upgrade
+```
+
+Useful for GitHub Enterprise instances.
+
+### COMPOSIO_GITHUB_OWNER
+
+<ParamField path="COMPOSIO_GITHUB_OWNER" type="string" default="ComposioHQ">
+  GitHub repository owner.
+</ParamField>
+
+### COMPOSIO_GITHUB_REPO
+
+<ParamField path="COMPOSIO_GITHUB_REPO" type="string" default="composio">
+  GitHub repository name.
+</ParamField>
+
+### COMPOSIO_GITHUB_TAG
+
+<ParamField path="COMPOSIO_GITHUB_TAG" type="string" default="latest">
+  Specific release tag to upgrade to.
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_GITHUB_TAG="@composio/cli@0.1.24"
+composio upgrade
+```
+
+Downloads version 0.1.24 instead of the latest.
+
+### COMPOSIO_GITHUB_ACCESS_TOKEN
+
+<ParamField path="COMPOSIO_GITHUB_ACCESS_TOKEN" type="string">
+  GitHub access token for API requests (avoids rate limiting).
+</ParamField>
+
+**Example:**
+
+```bash
+export COMPOSIO_GITHUB_ACCESS_TOKEN="ghp_your_token"
+composio upgrade
+```
+
+Useful during development to avoid GitHub's rate limits (60 requests/hour for unauthenticated users).
+
+## Terminal Configuration
+
+### NO_COLOR
+
+<ParamField path="NO_COLOR" type="boolean">
+  Disable colored output in the CLI.
+  
+  **Standard:** [no-color.org](https://no-color.org/)
+</ParamField>
+
+**Example:**
+
+```bash
+export NO_COLOR=1
+composio generate
+```
+
+Outputs plain text without ANSI color codes (useful for logging systems).
+
+## Development/Debugging
+
+### DEBUG_OVERRIDE_VERSION
+
+<ParamField path="DEBUG_OVERRIDE_VERSION" type="string">
+  Override the CLI version for debugging upgrade behavior.
+  
+  **Development use only.**
+</ParamField>
+
+**Example:**
+
+```bash
+export DEBUG_OVERRIDE_VERSION="0.1.0"
+composio upgrade
+```
+
+Forces the CLI to think it's running version 0.1.0, triggering an upgrade.
+
+## User Config File
+
+The CLI stores persistent configuration in `~/.composio/user-config.json`:
+
+```json
+{
+  "api_key": "uak_b813ydmoEYdB_xBxGHeW",
+  "base_url": "https://backend.composio.dev",
+  "web_url": "https://platform.composio.dev",
+  "org_id": "k2OiqRLMdHyM",
+  "project_id": "pr_xlSR6oN5jIlk",
+  "test_user_id": "pg-test-12345"
+}
+```
+
+This file is created and updated by:
+- `composio login` - Stores API key and org/project IDs
+- `composio logout` - Clears API key
+- `composio orgs switch` - Updates default org/project
+
+<Warning>
+  The `user-config.json` file contains your API key. Keep it secure and never commit it to version control.
+</Warning>
+
+## Configuration Precedence
+
+When the same setting is defined in multiple places:
+
+1. **CLI flags** (highest precedence)
+2. **Environment variables**
+3. **User config file** (`~/.composio/user-config.json`)
+4. **Default values** (lowest precedence)
+
+**Example:**
+
+```bash
+# Config file: base_url = "https://backend.composio.dev"
+export COMPOSIO_BASE_URL="https://api-staging.composio.dev"
+
+# Environment variable wins
+composio generate
+# Uses: https://api-staging.composio.dev
+```
+
+## Examples
+
+### CI/CD Configuration
+
+```bash
+#!/bin/bash
+# .github/workflows/generate-types.yml
+
+export COMPOSIO_API_KEY="${{ secrets.COMPOSIO_API_KEY }}"
+export COMPOSIO_LOG_LEVEL="info"
+export FORCE_USE_CACHE="true"
+
+composio generate --toolkits github --toolkits gmail
+```
+
+### Staging Environment
+
+```bash
+# .env.staging
+export COMPOSIO_BASE_URL="https://api-staging.composio.dev"
+export COMPOSIO_WEB_URL="https://app-staging.composio.dev"
+export COMPOSIO_LOG_LEVEL="debug"
+
+source .env.staging
+composio login
+```
+
+### Offline Development
+
+```bash
+# Warm the cache
+composio generate
+
+# Work offline
+export FORCE_USE_CACHE="true"
+export COMPOSIO_LOG_LEVEL="debug"
+composio generate --toolkits slack
+```
+
+### Custom Cache Location
+
+```bash
+# Use project-local cache
+export COMPOSIO_CACHE_DIR="./.composio-cache"
+composio generate
+
+# Add to .gitignore
+echo ".composio-cache/" >> .gitignore
+```
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Toolkit Versions" icon="tag" href="/cli/configuration/toolkit-versions">
+    Pin toolkit versions
+  </Card>
+  <Card title="Login" icon="right-to-bracket" href="/cli/commands/login">
+    Authentication guide
+  </Card>
+</CardGroup>

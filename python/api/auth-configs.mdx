@@ -1,0 +1,58 @@
+---
+title: Auth Configs
+description: Manage authentication configurations for toolkits
+---
+
+Auth Configs define how users authenticate with toolkits. They specify OAuth credentials, API key requirements, and other authentication settings.
+
+## Methods
+
+### list
+
+```python
+configs = composio.auth_configs.list(
+    toolkit_slug="github"
+)
+```
+
+### create
+
+```python
+config = composio.auth_configs.create(
+    toolkit="github",
+    options={
+        "type": "use_composio_managed_auth",
+        "tool_access_config": {
+            "tools_for_connected_account_creation": []
+        }
+    }
+)
+```
+
+### get
+
+```python
+config = composio.auth_configs.get("ac_xxx")
+```
+
+### update
+
+```python
+updated = composio.auth_configs.update(
+    "ac_xxx",
+    options={"type": "custom", "credentials": {...}}
+)
+```
+
+### delete
+
+```python
+composio.auth_configs.delete("ac_xxx")
+```
+
+### enable / disable
+
+```python
+composio.auth_configs.enable("ac_xxx")
+composio.auth_configs.disable("ac_xxx")
+```

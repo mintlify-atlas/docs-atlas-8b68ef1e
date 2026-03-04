@@ -1,0 +1,151 @@
+---
+title: Decorators & Modifiers
+description: Transform tool schemas and execution behavior with decorators
+---
+
+Composio provides powerful decorators to modify tool schemas and execution behavior.
+
+## Schema Modifiers
+
+Transform tool schemas before they're used:
+
+```python
+from composio import Composio, schema_modifier
+
+composio = Composio()
+
+@schema_modifier(tools=["GITHUB_CREATE_ISSUE"])
+def modify_schema(tool: str, toolkit: str, schema):
+    # Customize the schema
+    schema.description = f"Enhanced: {schema.description}"
+    return schema
+
+# Apply modifier when getting tools
+tools = composio.tools.get(
+    user_id="default",
+    toolkits=["github"],
+    modifiers=[modify_schema]
+)
+```
+
+## Before Execute
+
+Modify tool parameters before execution:
+
+```python
+from composio import before_execute
+
+@before_execute(tools=["GITHUB_CREATE_ISSUE"])
+def log_execution(tool: str, toolkit: str, params):
+    print(f"Executing {tool} with {params['arguments']}")
+    # Modify parameters
+    params['arguments']['labels'] = ['automated']
+    return params
+
+# Apply when executing
+result = composio.tools.execute(
+    slug="GITHUB_CREATE_ISSUE",
+    arguments={...},
+    modifiers=[log_execution]
+)
+```
+
+## After Execute
+
+Transform tool execution results:
+
+```python
+from composio import after_execute
+
+@after_execute(tools=["GITHUB_CREATE_ISSUE"])
+def process_result(tool: str, toolkit: str, response):
+    # Add metadata
+    response['data']['processed_at'] = datetime.now().isoformat()
+    return response
+
+result = composio.tools.execute(
+    slug="GITHUB_CREATE_ISSUE",
+    arguments={...},
+    modifiers=[process_result]
+)
+```
+
+## Apply to All Tools
+
+```python
+# Apply to all tools in toolkit
+@schema_modifier(toolkits=["github"])
+def modify_all_github(tool: str, toolkit: str, schema):
+    return schema
+
+# Apply to all tools
+@before_execute
+def log_all(tool: str, toolkit: str, params):
+    print(f"Executing {tool}")
+    return params
+```
+
+## Combining Modifiers
+
+```python
+tools = composio.tools.get(
+    user_id="default",
+    toolkits=["github"],
+    modifiers=[
+        schema_modifier1,
+        schema_modifier2,
+        before_execute1
+    ]
+)
+```
+
+## Complete Example
+
+```python
+from composio import (
+    Composio,
+    schema_modifier,
+    before_execute,
+    after_execute
+)
+import logging
+
+composio = Composio()
+logger = logging.getLogger(__name__)
+
+@schema_modifier(toolkits=["github"])
+def enhance_github_tools(tool: str, toolkit: str, schema):
+    """Add custom metadata to GitHub tools"""
+    schema.description = f"[GitHub] {schema.description}"
+    return schema
+
+@before_execute(toolkits=["github"])
+def log_execution(tool: str, toolkit: str, params):
+    """Log all GitHub tool executions"""
+    logger.info(f"Executing {tool}")
+    logger.debug(f"Arguments: {params['arguments']}")
+    return params
+
+@after_execute(toolkits=["github"])
+def add_metadata(tool: str, toolkit: str, response):
+    """Add execution metadata"""
+    if response['successful']:
+        response['data']['_meta'] = {
+            'tool': tool,
+            'toolkit': toolkit
+        }
+    return response
+
+# Use modifiers
+tools = composio.tools.get(
+    user_id="default",
+    toolkits=["github"],
+    modifiers=[enhance_github_tools]
+)
+
+result = composio.tools.execute(
+    slug="GITHUB_CREATE_ISSUE",
+    arguments={...},
+    modifiers=[log_execution, add_metadata]
+)
+```

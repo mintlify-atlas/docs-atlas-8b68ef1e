@@ -1,0 +1,151 @@
+---
+title: composio version
+description: Display the current Composio CLI version
+---
+
+The `composio version` command displays the current version of the Composio CLI.
+
+## Usage
+
+```bash
+composio version
+```
+
+## Description
+
+Displays the semantic version (semver) of the installed CLI binary.
+
+## Examples
+
+### Display Version
+
+```bash
+composio version
+```
+
+**Output:**
+
+```
+◇  0.1.33
+```
+
+### Capture Version in Scripts
+
+```bash
+# Get version as plain string (piped mode)
+VERSION=$(composio version 2>/dev/null)
+echo "CLI Version: $VERSION"
+```
+
+**Piped output:**
+
+```
+0.1.33
+```
+
+### Check Version Programmatically
+
+```bash
+# Compare version before running commands
+VERSION=$(composio version 2>/dev/null)
+if [[ "$VERSION" < "0.1.30" ]]; then
+  echo "Please upgrade: composio upgrade"
+else
+  echo "Version OK: $VERSION"
+fi
+```
+
+### Display Full CLI Help
+
+```bash
+composio --help
+```
+
+Shows all available commands and global options.
+
+## Output Format
+
+### Interactive Mode (TTY)
+
+- **stdout:** Silent (no data output)
+- **stderr:** Decorated output with CLI formatting
+- Human-readable display
+
+**Example:**
+
+```
+◇  0.1.33
+```
+
+### Piped Mode (Not TTY)
+
+- **stdout:** Plain version string only
+- **stderr:** Silent (all decoration suppressed)
+- Machine-readable for scripts
+
+**Example:**
+
+```bash
+composio version | cat
+# Output: 0.1.33
+```
+
+## Version Format
+
+The CLI uses [semantic versioning](https://semver.org/) (semver):
+
+```
+MAJOR.MINOR.PATCH
+```
+
+- **MAJOR:** Breaking changes (e.g., 1.0.0 → 2.0.0)
+- **Minor:** New features, backward compatible (e.g., 0.1.0 → 0.2.0)
+- **Patch:** Bug fixes, backward compatible (e.g., 0.1.0 → 0.1.1)
+
+**Example:** `0.1.33`
+
+- **Major:** 0 (pre-1.0, API may change)
+- **Minor:** 1 (feature set)
+- **Patch:** 33 (bug fix iteration)
+
+## Version Source
+
+The version is read from the CLI's embedded `package.json`:
+
+```json
+{
+  "name": "@composio/cli",
+  "version": "0.1.33"
+}
+```
+
+This is baked into the binary at build time.
+
+## Checking for Updates
+
+To check if a newer version is available:
+
+```bash
+composio upgrade
+```
+
+The `upgrade` command:
+1. Fetches the latest release from GitHub
+2. Compares with your current version
+3. Upgrades if a newer version exists
+
+## Related Commands
+
+- [`composio upgrade`](/cli/commands/upgrade) - Update to the latest version
+- [`composio --help`](/cli/overview) - Display CLI help
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="upgrade" icon="arrow-up" href="/cli/commands/upgrade">
+    Update your CLI
+  </Card>
+  <Card title="Installation" icon="download" href="/cli/installation">
+    Installation guide
+  </Card>
+</CardGroup>

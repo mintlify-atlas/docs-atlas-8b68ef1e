@@ -1,0 +1,501 @@
+---
+title: Custom Tools
+description: Learn how to create and manage custom tools in the Composio SDK
+---
+
+# Custom Tools
+
+Custom tools allow you to extend the Composio SDK with your own implementations while maintaining a consistent interface with built-in tools. Create custom logic, wrap external APIs, or build specialized functionality tailored to your use case.
+
+## Overview
+
+The `CustomTools` class manages user-created tools that can be registered, retrieved, and executed alongside Composio's built-in tools. Custom tools are stored in an in-memory registry and support the same execution patterns as native tools.
+
+**Source:** `ts/packages/core/src/models/CustomTools.ts`
+
+## Creating Custom Tools
+
+### Basic Custom Tool
+
+Create a simple custom tool without external dependencies:
+
+```typescript
+import { z } from 'zod';
+
+const customTool = await composio.tools.createCustomTool({
+  name: 'Calculate Sum',
+  description: 'Adds two numbers together',
+  slug: 'CALCULATE_SUM',
+  inputParams: z.object({
+    a: z.number().describe('First number'),
+    b: z.number().describe('Second number')
+  }),
+  execute: async (input) => {
+    const sum = input.a + input.b;
+    return {
+      data: { result: sum },
+      error: null,
+      successful: true
+    };
+  }
+});
+
+console.log('Custom tool created:', customTool.slug);
+```
+
+### Custom Tool with Optional Parameters
+
+```typescript
+import { z } from 'zod';
+
+const searchTool = await composio.tools.createCustomTool({
+  name: 'Search Database',
+  description: 'Searches the database with optional filters',
+  slug: 'SEARCH_DATABASE',
+  inputParams: z.object({
+    query: z.string().describe('Search query'),
+    limit: z.number().optional().describe('Maximum number of results'),
+    offset: z.number().optional().describe('Number of results to skip')
+  }),
+  execute: async (input) => {
+    // Custom implementation
+    const results = await database.search({
+      query: input.query,
+      limit: input.limit ?? 10,
+      offset: input.offset ?? 0
+    });
+    
+    return {
+      data: { results },
+      error: null,
+      successful: true
+    };
+  }
+});
+```
+
+## Custom Tools with Toolkit Integration
+
+Create custom tools that leverage existing toolkit credentials:
+
+```typescript
+import { z } from 'zod';
+
+const customGitHubTool = await composio.tools.createCustomTool({
+  name: 'Get Repository Stats',
+  description: 'Fetches detailed statistics for a GitHub repository',
+  slug: 'GITHUB_GET_REPO_STATS',
+  toolkitSlug: 'github', // Link to GitHub toolkit
+  userId: 'user_123',
+  connectedAccountId: 'conn_abc', // Use specific connected account
+  inputParams: z.object({
+    owner: z.string().describe('Repository owner'),
+    repo: z.string().describe('Repository name')
+  }),
+  execute: async (input, connectionConfig, executeToolRequest) => {
+    // Use executeToolRequest to make authenticated API calls
+    const issuesResponse = await executeToolRequest({
+      endpoint: `/repos/${input.owner}/${input.repo}/issues`,
+      method: 'GET',
+      parameters: [
+        { name: 'state', in: 'query', value: 'all' }
+      ]
+    });
+    
+    const starsResponse = await executeToolRequest({
+      endpoint: `/repos/${input.owner}/${input.repo}`,
+      method: 'GET'
+    });
+    
+    return {
+      data: {
+        totalIssues: issuesResponse.data.length,
+        stars: starsResponse.data.stargazers_count
+      },
+      error: null,
+      successful: true
+    };
+  }
+});
+```
+
+<Info>
+When a `toolkitSlug` is provided, the custom tool can access authentication credentials from connected accounts and use `executeToolRequest` to make authenticated API calls.
+</Info>
+
+## Execute Function Parameters
+
+The `execute` function receives three parameters:
+
+### 1. Input (parsed and validated)
+
+The input parameters after Zod schema validation:
+
+```typescript
+execute: async (input) => {
+  // input is type-safe and validated
+  console.log(input.query); // TypeScript knows this exists
+}
+```
+
+### 2. Connection Config (nullable)
+
+Authentication credentials when using a toolkit:
+
+```typescript
+execute: async (input, connectionConfig) => {
+  if (connectionConfig) {
+    // Access OAuth tokens, API keys, etc.
+    console.log('Auth available:', connectionConfig);
+  }
+}
+```
+
+### 3. Execute Tool Request (function)
+
+Make authenticated API calls to the toolkit:
+
+```typescript
+execute: async (input, connectionConfig, executeToolRequest) => {
+  const response = await executeToolRequest({
+    endpoint: '/api/endpoint',
+    method: 'GET',
+    parameters: [
+      { name: 'param', in: 'query', value: 'value' }
+    ],
+    body: { key: 'value' }
+  });
+  
+  return {
+    data: response.data,
+    error: null,
+    successful: true
+  };
+}
+```
+
+<Note>
+`executeToolRequest` is only available when `toolkitSlug` is specified and is not 'custom'. It provides a proxy to make authenticated requests using the connected account's credentials.
+</Note>
+
+## Retrieving Custom Tools
+
+### Get All Custom Tools
+
+```typescript
+// Get all registered custom tools
+const allTools = await composio.customTools.getCustomTools({});
+console.log(`Found ${allTools.length} custom tools`);
+```
+
+### Get Specific Custom Tools
+
+```typescript
+// Get specific custom tools by slug
+const specificTools = await composio.customTools.getCustomTools({
+  toolSlugs: ['MY_CUSTOM_TOOL', 'ANOTHER_CUSTOM_TOOL']
+});
+```
+
+### Get a Single Custom Tool
+
+```typescript
+// Get a specific custom tool by its slug
+const myTool = await composio.customTools.getCustomToolBySlug('MY_CUSTOM_TOOL');
+
+if (myTool) {
+  console.log(`Found tool: ${myTool.name}`);
+  console.log('Description:', myTool.description);
+  console.log('Input schema:', myTool.inputParameters);
+} else {
+  console.log('Tool not found');
+}
+```
+
+## Executing Custom Tools
+
+Custom tools can be executed using the same API as built-in tools:
+
+```typescript
+// Execute a custom tool without toolkit integration
+const result = await composio.tools.execute('CALCULATE_SUM', {
+  arguments: {
+    a: 5,
+    b: 3
+  }
+});
+
+console.log(result.data); // { result: 8 }
+
+// Execute a custom tool with toolkit integration
+const result = await composio.tools.execute('GITHUB_GET_REPO_STATS', {
+  userId: 'user_123',
+  connectedAccountId: 'conn_abc',
+  arguments: {
+    owner: 'composio',
+    repo: 'sdk'
+  }
+});
+
+console.log(result.data); // { totalIssues: 42, stars: 1337 }
+```
+
+## Integration with Provider Tools
+
+Custom tools work seamlessly with Composio providers:
+
+```typescript
+import { OpenAI } from 'openai';
+import { OpenAIProvider } from '@composio/openai';
+
+// Create custom tools
+await composio.tools.createCustomTool({
+  name: 'Get Weather',
+  slug: 'GET_WEATHER',
+  description: 'Gets current weather for a city',
+  inputParams: z.object({
+    city: z.string().describe('City name')
+  }),
+  execute: async (input) => {
+    const weather = await weatherAPI.getCurrentWeather(input.city);
+    return {
+      data: { temperature: weather.temp, conditions: weather.description },
+      error: null,
+      successful: true
+    };
+  }
+});
+
+// Get both custom and built-in tools
+const tools = await composio.tools.get('user_123', {
+  tools: ['GET_WEATHER', 'GITHUB_GET_REPOS']
+});
+
+// Use with OpenAI
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: 'What is the weather in San Francisco?' }],
+  tools: tools // Custom and built-in tools combined
+});
+```
+
+## Custom Tool Schema Generation
+
+The SDK automatically generates JSON Schema from Zod schemas:
+
+```typescript
+import { z } from 'zod';
+
+const tool = await composio.tools.createCustomTool({
+  name: 'Complex Tool',
+  slug: 'COMPLEX_TOOL',
+  description: 'Demonstrates complex input schema',
+  inputParams: z.object({
+    user: z.object({
+      name: z.string().describe('User full name'),
+      email: z.string().email().describe('User email address')
+    }).describe('User information'),
+    preferences: z.array(z.string()).optional().describe('User preferences'),
+    metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata')
+  }),
+  execute: async (input) => {
+    // input is fully typed and validated
+    console.log('User:', input.user.name);
+    console.log('Email:', input.user.email);
+    console.log('Preferences:', input.preferences);
+    
+    return {
+      data: { success: true },
+      error: null,
+      successful: true
+    };
+  }
+});
+
+// Access the generated schema
+console.log(tool.inputParameters);
+```
+
+<Tip>
+Zod provides excellent TypeScript inference, so your custom tool execute functions are fully type-safe without additional type annotations.
+</Tip>
+
+## Error Handling in Custom Tools
+
+```typescript
+const tool = await composio.tools.createCustomTool({
+  name: 'Risky Operation',
+  slug: 'RISKY_OPERATION',
+  description: 'An operation that might fail',
+  inputParams: z.object({
+    value: z.string()
+  }),
+  execute: async (input) => {
+    try {
+      const result = await riskyExternalAPI.call(input.value);
+      
+      return {
+        data: { result },
+        error: null,
+        successful: true
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error.message,
+        successful: false
+      };
+    }
+  }
+});
+```
+
+## Complete Example: Custom Slack Tool
+
+```typescript
+import { z } from 'zod';
+
+// Create a custom Slack tool that uses the Slack toolkit credentials
+const customSlackTool = await composio.tools.createCustomTool({
+  name: 'Send Formatted Announcement',
+  description: 'Sends a formatted announcement to multiple Slack channels',
+  slug: 'SLACK_SEND_ANNOUNCEMENT',
+  toolkitSlug: 'slack',
+  userId: 'user_123',
+  inputParams: z.object({
+    channels: z.array(z.string()).describe('List of channel IDs'),
+    title: z.string().describe('Announcement title'),
+    message: z.string().describe('Announcement message'),
+    mentions: z.array(z.string()).optional().describe('User IDs to mention')
+  }),
+  execute: async (input, connectionConfig, executeToolRequest) => {
+    const results = [];
+    
+    // Format the message
+    let formattedMessage = `*${input.title}*\n\n${input.message}`;
+    
+    if (input.mentions && input.mentions.length > 0) {
+      const mentionText = input.mentions.map(id => `<@${id}>`).join(' ');
+      formattedMessage += `\n\n${mentionText}`;
+    }
+    
+    // Send to each channel
+    for (const channel of input.channels) {
+      try {
+        const response = await executeToolRequest({
+          endpoint: '/chat.postMessage',
+          method: 'POST',
+          body: {
+            channel: channel,
+            text: formattedMessage,
+            mrkdwn: true
+          }
+        });
+        
+        results.push({
+          channel,
+          success: true,
+          timestamp: response.data.ts
+        });
+      } catch (error) {
+        results.push({
+          channel,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    return {
+      data: { results },
+      error: null,
+      successful: true
+    };
+  }
+});
+
+// Execute the custom tool
+const result = await composio.tools.execute('SLACK_SEND_ANNOUNCEMENT', {
+  userId: 'user_123',
+  arguments: {
+    channels: ['C12345', 'C67890'],
+    title: 'System Maintenance',
+    message: 'Scheduled maintenance tonight at 10 PM PST',
+    mentions: ['U123', 'U456']
+  }
+});
+
+console.log('Announcement sent:', result.data.results);
+```
+
+## Custom Tool Properties
+
+Registered custom tools have the same properties as built-in tools:
+
+- `slug` - Unique identifier
+- `name` - Human-readable name
+- `description` - Tool description
+- `inputParameters` - JSON Schema for input (auto-generated from Zod)
+- `outputParameters` - JSON Schema for output
+- `toolkit` - Always set to `{ name: 'custom', slug: 'custom' }` unless `toolkitSlug` is specified
+- `tags` - Empty array (can be customized in future versions)
+
+## Limitations and Considerations
+
+<Note>
+**In-Memory Registry:** Custom tools are stored in memory and are not persisted. You need to re-register them when creating a new Composio instance.
+</Note>
+
+- Custom tools are scoped to the Composio instance
+- The `toolkitSlug` in custom tools is used for authentication, not for categorization
+- When using `executeToolRequest`, the toolkit must not be 'custom'
+- Input validation is automatic via Zod schemas
+- Output schema is currently a placeholder (future enhancement)
+
+## Error Handling
+
+Common errors when working with custom tools:
+
+- `ComposioToolNotFoundError` - Custom tool not found in registry
+- `ComposioInvalidExecuteFunctionError` - Invalid or missing execute function
+- `ComposioConnectedAccountNotFoundError` - No connected account for specified toolkit
+- `ValidationError` - Input parameters don't match Zod schema
+
+```typescript
+import {
+  ComposioToolNotFoundError,
+  ValidationError
+} from '@composio/core';
+
+try {
+  const result = await composio.tools.execute('NONEXISTENT_TOOL', {
+    arguments: {}
+  });
+} catch (error) {
+  if (error instanceof ComposioToolNotFoundError) {
+    console.error('Custom tool not registered');
+  } else if (error instanceof ValidationError) {
+    console.error('Invalid input parameters:', error.message);
+  } else {
+    throw error;
+  }
+}
+```
+
+## Best Practices
+
+1. **Use descriptive slugs**: Make tool slugs clear and unique (e.g., `COMPANY_ACTION_OBJECT`)
+2. **Provide detailed descriptions**: Help AI models understand when to use your tool
+3. **Validate inputs thoroughly**: Use Zod's rich validation features
+4. **Handle errors gracefully**: Return structured errors in the response
+5. **Document parameters**: Use `.describe()` on all Zod fields
+6. **Keep tools focused**: Each tool should do one thing well
+7. **Reuse toolkit credentials**: Leverage existing connections when possible
+
+## Related Resources
+
+- [Tools](/concepts/tools) - Working with built-in tools
+- [Toolkits](/concepts/toolkits) - Understanding toolkit integration
+- [Connected Accounts](/concepts/connected-accounts) - Using credentials in custom tools
+- [Providers](/concepts/providers) - Integrating custom tools with AI frameworks
