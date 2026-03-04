@@ -1,0 +1,246 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Composio",
+  "projectDescription": "SDK that powers 1000+ toolkits, tool search, context management, authentication, and a sandboxed workbench to help build AI agents that turn intent into action.",
+  "theme": "sequoia",
+  "primaryColor": "#8B5CF6",
+  "lightColor": "#A78BFA",
+  "darkColor": "#7C3AED",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/tools",
+              "concepts/toolkits",
+              "concepts/connected-accounts",
+              "concepts/authentication",
+              "concepts/custom-tools",
+              "concepts/providers"
+            ]
+          },
+          {
+            "group": "Installation",
+            "pages": [
+              "installation/typescript",
+              "installation/python",
+              "installation/cli"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/tool-execution",
+              "guides/authentication-flows",
+              "guides/custom-tools",
+              "guides/modifiers",
+              "guides/file-handling",
+              "guides/error-handling",
+              "guides/environment-variables"
+            ]
+          },
+          {
+            "group": "MCP & Rube",
+            "pages": [
+              "mcp/overview",
+              "mcp/rube"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "TypeScript SDK",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "typescript/overview",
+              "typescript/installation"
+            ]
+          },
+          {
+            "group": "Core API",
+            "pages": [
+              "typescript/api/composio",
+              "typescript/api/tools",
+              "typescript/api/toolkits",
+              "typescript/api/connected-accounts",
+              "typescript/api/auth-configs",
+              "typescript/api/triggers",
+              "typescript/api/custom-tools"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "typescript/providers/overview",
+              "typescript/providers/openai",
+              "typescript/providers/openai-agents",
+              "typescript/providers/anthropic",
+              "typescript/providers/langchain",
+              "typescript/providers/llamaindex",
+              "typescript/providers/vercel",
+              "typescript/providers/google",
+              "typescript/providers/mastra",
+              "typescript/providers/cloudflare",
+              "typescript/providers/custom"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "typescript/advanced/tool-router",
+              "typescript/advanced/mcp",
+              "typescript/advanced/files",
+              "typescript/advanced/platform-support"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Python SDK",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "python/overview",
+              "python/installation"
+            ]
+          },
+          {
+            "group": "Core API",
+            "pages": [
+              "python/api/composio",
+              "python/api/tools",
+              "python/api/toolkits",
+              "python/api/connected-accounts",
+              "python/api/auth-configs",
+              "python/api/triggers",
+              "python/api/custom-tools"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "python/providers/overview",
+              "python/providers/openai",
+              "python/providers/openai-agents",
+              "python/providers/anthropic",
+              "python/providers/langchain",
+              "python/providers/langgraph",
+              "python/providers/llamaindex",
+              "python/providers/crewai",
+              "python/providers/autogen",
+              "python/providers/gemini",
+              "python/providers/google",
+              "python/providers/google-adk"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "python/advanced/tool-router",
+              "python/advanced/mcp",
+              "python/advanced/decorators"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "cli/overview",
+              "cli/installation"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/commands/login",
+              "cli/commands/whoami",
+              "cli/commands/generate",
+              "cli/commands/upgrade",
+              "cli/commands/version"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "cli/configuration/environment-variables",
+              "cli/configuration/toolkit-versions"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "TypeScript Examples",
+            "pages": [
+              "examples/typescript/openai-basic",
+              "examples/typescript/anthropic-basic",
+              "examples/typescript/langchain",
+              "examples/typescript/custom-tools",
+              "examples/typescript/file-handling"
+            ]
+          },
+          {
+            "group": "Python Examples",
+            "pages": [
+              "examples/python/openai-basic",
+              "examples/python/langchain",
+              "examples/python/crewai",
+              "examples/python/custom-tools"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "1000+ pre-built toolkits for popular services (GitHub, Gmail, Slack, etc.)",
+    "Multi-language SDK support (TypeScript and Python)",
+    "Universal provider system supporting OpenAI, Anthropic, LangChain, CrewAI, and more",
+    "Managed authentication and connected accounts",
+    "Custom tool creation with type-safe schemas",
+    "Tool execution with automatic file handling",
+    "Real-time triggers and webhooks",
+    "MCP (Model Context Protocol) server support via Rube",
+    "CLI for code generation and authentication",
+    "Tool versioning and toolkit management",
+    "Cross-platform support (Node.js, Deno, Cloudflare Workers)",
+    "Tool Router for agentic workflows"
+  ],
+  "publicApiSurface": [
+    "Composio - Main SDK class",
+    "composio.tools.get() - Fetch tools by toolkit",
+    "composio.tools.execute() - Execute tool with parameters",
+    "composio.tools.createCustomTool() - Create custom tools",
+    "composio.toolkits.list() - List available toolkits",
+    "composio.connectedAccounts.create() - Create connected account",
+    "composio.connectedAccounts.get() - Get connected account",
+    "composio.authConfigs.create() - Create auth configuration",
+    "composio.triggers.subscribe() - Subscribe to triggers",
+    "composio.mcp.createServer() - Create MCP server",
+    "OpenAIProvider - OpenAI integration",
+    "AnthropicProvider - Anthropic integration",
+    "LangChainProvider - LangChain integration",
+    "createConnectionRequest() - OAuth flow helper",
+    "jsonSchemaToZodSchema() - Schema conversion utility",
+    "@composio/cli - Command-line interface"
+  ]
+}
